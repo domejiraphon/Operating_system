@@ -25,6 +25,7 @@ char **manipulate_args(int argc, const char *const *argv, int (*const manip)(int
   args[argc] = NULL;
   return args;
 }
+/*
 void free_copied_args(char **upper_args, char **lower_args){
   char **temp = upper_args;
   while (*upper_args++)
@@ -36,24 +37,21 @@ void free_copied_args(char **upper_args, char **lower_args){
     free(*lower_args);
   free(temp);
 }
-/*
-void free_copied_args(char **upper_args){
-  //int length = sizeof(upper_args) / sizeof(char *);
+*/
+void free_copied_args(char **upper_args, char **lower_args){
   int length = 0;
   char **tmp=upper_args;
   while (*tmp++)
     length++;
   
-  for(int i = 0; i < length; i++){
+  for(int i = 0; i <= length; i++){
     free(upper_args[i]);
-    //free(lower_args[i]);
+    free(lower_args[i]);
   }
   free(upper_args);
-  //free(lower_args);
-  
-  
+  free(lower_args);
 }
-*/
+
 
 
 
