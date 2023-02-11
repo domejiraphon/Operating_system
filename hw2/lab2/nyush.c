@@ -4,6 +4,7 @@ I read how to concatenate string https://cplusplus.com/reference/cstring/strcat/
 https://www.programiz.com/c-programming/library-function/string.h/strcmp
 https://stackoverflow.com/questions/12510874/how-can-i-check-if-a-directory-exists
 https://www.geeksforgeeks.org/signals-c-language/
+https://www.geeksforgeeks.org/strtok-strtok_r-functions-c-examples/
 */
 #include <ctype.h>
 #include <stdio.h>
@@ -57,81 +58,73 @@ void header(){
   free(base);
 }
 
-char *parsingCmd(char *lineCmd){
-  int lengthCmd=0;
-  int lengthEntire = strlen(lineCmd);
-  
-  for (; lengthCmd < lengthEntire - 1&& lineCmd[lengthCmd] != ' '; lengthCmd++)
-    ;
-  
-  char *file = (char *)malloc((lengthCmd + 1) * sizeof(char));
-  for (int i=0; i< lengthCmd; i++)
-    file[i] = lineCmd[i];
-  file[lengthCmd] = '\0';
-  //printf("%s, %d\n", file, (int) strlen(file));
-  return file;
-}
-
-int numArg(char *lineCmd){
+int numArg(const char *lineCmd){
   int argc=0;
-  int i=0;
-  int lengthEntire = strlen(lineCmd);
+  const char *delim = " ";
   
-  while (i < lengthEntire - 1){
-    while (i < lengthEntire - 1 && lineCmd[i] == ' ')
-      i++;
-    while (i < lengthEntire - 1&& lineCmd[i] != ' ')
-      i++;
-    if (i > lengthEntire - 1)
-      break;
+  char *str= (char *)malloc((strlen(lineCmd) + 1) * sizeof(char));
+  strcpy(str, lineCmd);
+  char **saveptr=&str;
+  
+  while (strtok_r(str, delim, saveptr))
     argc++;
-  }
   
- 
+  //free(str);
+  
   return argc;
 }
 
 char **parsingArgv(char *lineCmd){
-  int lengthEntire = strlen(lineCmd);
+  
   int argc = numArg(lineCmd);
-  int st=0;
-  while (lineCmd[st] != ' ')
-    st++;
-  while (lineCmd[st] == ' ')
-    st++;
+  
+  char *str= (char *)malloc((strlen(lineCmd) + 1) * sizeof(char));
+  strcpy(str, lineCmd);
   
   char **argv = (char **)malloc((argc) * sizeof(char *));
   
-  for(int j=0; j < argc-1; j++) {
-    int stringLength=0;
-    while (st < lengthEntire - 1 && lineCmd[st] == ' ')
-      st++;
-    int tmp = st;
-    while (st < lengthEntire - 1 && lineCmd[st] != ' '){
-      stringLength++;
-      st++;
-    }
-    argv[j] = (char *)malloc((stringLength+1) * sizeof(char));
-    for (int k=0; k<stringLength; k++)
-      argv[j][k] = lineCmd[tmp++];
+  char *saveptr=str;
+  char *token = lineCmd;
+  const char *delim = " ";
+  
+  for (int j=0; ; j++, str = NULL) {
+    token = strtok_r(str, delim, &saveptr);
+    if (!token)
+      break;
+    
+    int stringLength = strlen(token);
+    if (j == argc - 1)
+      stringLength--;
+    argv[j] = (char *)malloc((stringLength + 1) * sizeof(char));
+    strcpy(argv[j], token);
     argv[j][stringLength] = '\0';
   }
+  /*
+  for (int i=0; i<argc; i++){
+    printf("%d, %s\n", (int) strlen(argv[i]), argv[i]);
+  }
+  */
   argv[argc] = NULL;
   return argv;
 }
 
-bool changeDir(const char *file, char **argvPtr){
+bool changeDir(char **argvPtr){
   const char* changeDirCmd = "cd";
-  int length = getLengthDoublePtr(argvPtr);
-  
-  bool out = strcmp(file, changeDirCmd) == 0;
+  const char* cmd = argvPtr[0];
+  bool out = strcmp(cmd, changeDirCmd) == 0;
   if (out){
-    if (length == 0 || length > 1)
+    int length = getLengthDoublePtr(argvPtr);
+    
+    if (length == 1 || length > 2)
       fprintf(stderr, "Error: invalid command\n");
     else{
-      DIR *dir = opendir(argvPtr[0]);
+      //const char *path = "/2250";//
+      const char *path = argvPtr[1];
+      DIR *dir = opendir(path);
+      //printf("%s\n", path);
+      //printf("%d", (int)strlen(path)); exit(0);
       if (dir)
-        chdir(argvPtr[0]);
+        chdir(path);
       else
         fprintf(stderr, "Error: invalid directory\n");
     }
@@ -139,9 +132,10 @@ bool changeDir(const char *file, char **argvPtr){
   return out;
 }
 
-bool exitTerm(const char *file, char **argvPtr){
+bool exitTerm(char **argvPtr){
   const char* exitCmd = "exit";
-  bool out = strcmp(file, exitCmd) == 0;
+  const char* cmd = argvPtr[0];
+  bool out = strcmp(cmd, exitCmd) == 0;
   int length = getLengthDoublePtr(argvPtr);
   if (out){
     if (length != 0)
@@ -152,6 +146,7 @@ bool exitTerm(const char *file, char **argvPtr){
     
   return out;
 }
+
 void handleExit(){
   printf("Kill child\n");
 }
@@ -164,25 +159,24 @@ void prompt(){
 
     //read and parse Command
     char *lineCmd = readLine();
-    const char *file = parsingCmd(lineCmd);
+    int argc = numArg(lineCmd);
     char **argvPtr = parsingArgv(lineCmd);
     
-    int argc = numArg(lineCmd);
-    char *argv[argc];
-    for (int i=0; i<argc; i++){
+    char *argv[argc-1];
+    for (int i=1; i<argc; i++){
       argv[i] = argvPtr[i];
       //printf("%s\n", argv[i]);
     }
     
-    if (!changeDir(file, argvPtr) &&
-        !exitTerm(file, argvPtr)){
+    if (!changeDir(argvPtr) &&
+        !exitTerm(argvPtr)){
       pid_t childPid = fork();
       if (childPid == 0) {
         //child
         //signal(SIGINT, handleExit);
         //signal(SIGTSTP, handleExit);
         
-        execvp(file, argv);
+        execvp(argvPtr[0], argv);
         exit(-1);
       } else {
         // parent

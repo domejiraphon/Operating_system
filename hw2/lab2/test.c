@@ -1,53 +1,28 @@
-#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
+#include <string.h>
 
-void sigint_handler(int signum) {
-  printf("Child process: Caught SIGINT, signum=%d\n", signum);
-}
+int
+main(int argc, char *argv[])
+{
+    char *str1, *str2, *token, *subtoken;
+    char *saveptr1, *saveptr2;
+    int j;
 
-int main() {
-  pid_t child_pid;
-
-  child_pid = fork();
-  if (child_pid == -1) {
-    perror("Error forking process");
-    return 1;
-  } else if (child_pid == 0) {
-    // This is the child process.
-
-    // Set up signal handler.
-    if (signal(SIGINT, sigint_handler) == SIG_ERR) {
-      perror("Error setting up signal handler");
-      return 1;
+   if (argc != 3) {
+        fprintf(stderr, "Usage: %s string delim",
+                argv[0]);
+        exit(EXIT_FAILURE);
     }
 
-    // Create a new process group.
-    if (setsid() == -1) {
-      perror("Error creating new process group");
-      return 1;
+   for (j = 1, str1 = argv[1]; ; j++, str1 = NULL) {
+        token = strtok_r(str1, argv[2], &saveptr1);
+        if (token == NULL)
+            break;
+        printf("%d: %s\n", j, token);
+
+       
     }
 
-    while (1) {
-      sleep(1);
-      printf("Child process: Running...\n");
-    }
-
-    return 0;
-  } else {
-    // This is the parent process.
-
-    sleep(3);
-
-    // Send SIGINT to the child process.
-    if (kill(child_pid, SIGINT) == -1) {
-      perror("Error sending signal");
-      return 1;
-    }
-
-    wait(NULL);
-
-    return 0;
-  }
+   exit(EXIT_SUCCESS);
 }
