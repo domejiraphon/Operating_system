@@ -16,33 +16,10 @@ https://stackoverflow.com/questions/12510874/how-can-i-check-if-a-directory-exis
 #include <sys/types.h>
 #include <dirent.h>
 
+#include "utils.h"
 
 #define SIZE_MAX 1000
 #define BASEDIR "[nyush "
-
-void helper(char **args);
-void free_copied_args(char **fmt, ...){
-  va_list args;
-  va_start(args, fmt);
-  while (fmt){
-    helper(fmt);
-    fmt = va_arg(args, char **);
-  }
-
-  va_end(args);
-}
-
-void helper(char **args){
-  int length = 0;
-  char **tmp=args;
-  while (*tmp++)
-    length++;
-  
-  for(int i = 0; i < length; i++)
-    free(args[i]);
-    
-  free(args);
-}
 
 char *readLine(){
   char *lineCmd = (char *)malloc((SIZE_MAX) * sizeof(char));
@@ -97,15 +74,18 @@ int numArg(char *lineCmd){
   int argc=0;
   int i=0;
   int lengthEntire = strlen(lineCmd);
+  
   while (i < lengthEntire - 1){
     while (i < lengthEntire - 1 && lineCmd[i] == ' ')
       i++;
-    while (i < lengthEntire - 1 && lineCmd[i] != ' ')
+    while (i < lengthEntire - 1&& lineCmd[i] != ' ')
       i++;
     if (i > lengthEntire - 1)
       break;
     argc++;
   }
+  
+ 
   return argc;
 }
 
@@ -147,7 +127,7 @@ bool changeDir(const char *file, char **argvPtr){
   
   bool out = strcmp(file, changeDirCmd) == 0;
   if (out){
-    if (length == 1 || length > 2)
+    if (length == 0 || length > 1)
       fprintf(stderr, "Error: invalid command\n");
     else{
       DIR *dir = opendir(argvPtr[0]);

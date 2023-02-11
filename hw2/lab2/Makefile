@@ -4,9 +4,11 @@ CFLAGS=-g -pedantic -std=gnu17 -Wall -Werror -Wextra
 .PHONY: all
 all: nyush
 
-nyuc: nyush.o 
+nyush: nyush.o utils.o
 
-nyush.o: nyush.c 
+nyush.o: nyush.c utils.h
+
+utils.o : utils.c utils.h
 
 .PHONY: clean
 clean:
