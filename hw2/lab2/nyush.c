@@ -136,9 +136,9 @@ bool exitTerm(char **argvPtr){
   const char* exitCmd = "exit";
   const char* cmd = argvPtr[0];
   bool out = strcmp(cmd, exitCmd) == 0;
-  int length = getLengthDoublePtr(argvPtr);
   if (out){
-    if (length != 0)
+     int length = getLengthDoublePtr(argvPtr);
+    if (length != 1)
       fprintf(stderr, "Error: invalid command\n");
     else
       exit(-1);
@@ -151,6 +151,30 @@ void handleExit(){
   printf("Kill child\n");
 }
 
+void execute(char *lineCmd, char **argv){
+  int argc = numArg(lineCmd);
+  char *argvArr[argc-1];
+  for (int i=1; i<=argc; i++){
+    argvArr[i] = argv[i];
+    //printf("%s\n", argv[i]);
+  }
+  
+  pid_t childPid = fork();
+  if (childPid == 0) {
+    //child
+    //signal(SIGINT, handleExit);
+    //signal(SIGTSTP, handleExit);
+    
+    execvp(argv[0], argvArr);
+    exit(-1);
+  } else {
+    // parent
+    //kill(childPid, SIGINT);
+    //kill(childPid, SIGTSTP);
+    
+    wait(NULL);
+  }
+}
 void prompt(){
   while (true) {
     //print terminal current directory
@@ -159,36 +183,15 @@ void prompt(){
 
     //read and parse Command
     char *lineCmd = readLine();
-    int argc = numArg(lineCmd);
-    char **argvPtr = parsingArgv(lineCmd);
+    char **argv = parsingArgv(lineCmd);
     
-    char *argv[argc-1];
-    for (int i=1; i<argc; i++){
-      argv[i] = argvPtr[i];
-      //printf("%s\n", argv[i]);
-    }
-    
-    if (!changeDir(argvPtr) &&
-        !exitTerm(argvPtr)){
-      pid_t childPid = fork();
-      if (childPid == 0) {
-        //child
-        //signal(SIGINT, handleExit);
-        //signal(SIGTSTP, handleExit);
-        
-        execvp(argvPtr[0], argv);
-        exit(-1);
-      } else {
-        // parent
-        //kill(childPid, SIGINT);
-        //kill(childPid, SIGTSTP);
-        
-        wait(NULL);
-      }
+    if (!changeDir(argv) &&
+        !exitTerm(argv)){
+      execute(lineCmd, argv);
     }
     
     free(lineCmd);
-    free_copied_args(argvPtr, NULL);
+    free_copied_args(argv, NULL);
   }
   
  
