@@ -1,0 +1,8 @@
+cat: '|': No such file or directory
+cat: sort: No such file or directory
+cat: '|': No such file or directory
+cat: uniq: No such file or directory
+cat: '>': No such file or directory
+cat: output7.txt: No such file or directory
+Error: invalid command
+free(): double free detected in tcache 2

@@ -3,7 +3,6 @@ I read STDOUT from this manual. https://en.cppreference.com/w/cpp/io/c/std_strea
 I read how to concatenate string https://cplusplus.com/reference/cstring/strcat/
 https://www.programiz.com/c-programming/library-function/string.h/strcmp
 https://stackoverflow.com/questions/12510874/how-can-i-check-if-a-directory-exists
-https://www.geeksforgeeks.org/signals-c-language/
 */
 #include <ctype.h>
 #include <stdio.h>
@@ -16,7 +15,6 @@ https://www.geeksforgeeks.org/signals-c-language/
 #include <stdarg.h>
 #include <sys/types.h>
 #include <dirent.h>
-#include<signal.h>
 
 #include "utils.h"
 
@@ -152,10 +150,6 @@ bool exitTerm(const char *file, char **argvPtr){
     
   return out;
 }
-void handleExit(){
-  printf("Kill child\n");
-}
-
 void prompt(){
   while (true) {
     //print terminal current directory
@@ -176,19 +170,13 @@ void prompt(){
     
     if (!changeDir(file, argvPtr) &&
         !exitTerm(file, argvPtr)){
-      pid_t childPid = fork();
-      if (childPid == 0) {
+      pid_t pid = fork();
+      if (pid == 0) {
         //child
-        //signal(SIGINT, handleExit);
-        //signal(SIGTSTP, handleExit);
-        
         execvp(file, argv);
         exit(-1);
       } else {
         // parent
-        //kill(childPid, SIGINT);
-        //kill(childPid, SIGTSTP);
-        
         wait(NULL);
       }
     }
@@ -196,16 +184,11 @@ void prompt(){
     free(lineCmd);
     free_copied_args(argvPtr, NULL);
   }
-  
  
 }
 
 int main() {
-  //signal(SIGINT, prompt);
-  //signal(SIGTSTP, prompt);
-  
   
   prompt();
-  
   return 0;
 }

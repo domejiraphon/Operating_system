@@ -1,0 +1,15 @@
+  PID TTY          TIME CMD
+    1 pts/0    00:00:00 bash
+45856 pts/0    00:00:00 gradeit.sh
+46984 pts/0    00:00:00 timeout
+46985 pts/0    00:00:00 bash
+46987 pts/0    00:00:00 nyush
+46988 pts/0    00:00:00 ps
+  PID TTY          TIME CMD
+    1 pts/0    00:00:00 bash
+45856 pts/0    00:00:00 gradeit.sh
+46984 pts/0    00:00:00 timeout
+46985 pts/0    00:00:00 bash
+46987 pts/0    00:00:00 nyush
+46989 pts/0    00:00:00 ps
+[nyush nyush-grading]$ [nyush nyush-grading]$ [nyush nyush-grading]$ 
