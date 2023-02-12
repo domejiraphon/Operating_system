@@ -28,7 +28,9 @@ https://www.geeksforgeeks.org/strtok-strtok_r-functions-c-examples/
 char *readLine(){
   char *lineCmd = (char *)malloc((SIZE_MAX) * sizeof(char));
   size_t size = SIZE_MAX;
-  getline(&lineCmd, &size, stdin);
+  if ((getline(&lineCmd, &size, stdin) == -1))
+    return NULL;
+  
   return lineCmd;
 }
 
@@ -69,8 +71,6 @@ int numArg(const char *lineCmd){
   
   while (strtok_r(str, delim, saveptr))
     argc++;
-  
-  //free(str);
   
   return argc;
 }
@@ -156,23 +156,29 @@ bool reDirect(char **argv){
   const char* cmd = argv[0];
   bool out = strcmp(cmd, "cat") == 0;
   if (out) {
-    bool read = strcmp(argv[1], "<") == 0;
-    bool write = strcmp(argv[1], ">") == 0;
-    if (write){
+    if (strcmp(argv[1], ">") == 0){
       int fd = open(argv[2], O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
       dup2(fd, 1);
       close(fd);
       fprintf(stdout, "This will be written to output.txt\n");
     }
-    else if (read) {
-      int fd = open(argv[2], O_RDONLY);
-      dup2(fd, 0);
-      close(fd);
-      char *out = readLine();
-      fprintf(stdout, out);
-      free(out);
+    else if (strcmp(argv[1], "<") == 0) {
+      const char *path = argv[2];
+      bool exist = access(path, F_OK) == 0;
+      if (!exist)
+        fprintf(stderr, "Error: invalid file\n");
+      else{
+        int fd = open(argv[2], O_RDONLY);
+        dup2(fd, 0);
+        close(fd);
+        char *out=NULL;
+        while ((out=readLine())){
+          fprintf(stdout, out);
+          free(out);
+        }
+        fprintf(stdout, "\n");
+      }
     }
-    //free(argv);
     
   }
 
@@ -214,8 +220,8 @@ void prompt(){
       execute(argv);
     }
     
-    //free(lineCmd);
-    //free_copied_args(argv, NULL);
+    free(lineCmd);
+    free_copied_args(argv, NULL);
   }
 }
 

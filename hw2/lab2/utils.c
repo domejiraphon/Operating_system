@@ -17,23 +17,19 @@ void free_copied_args(char **fmt, ...){
 
   va_end(args);
 }
-
-void helper(char **args){
+int getLengthDoublePtr(char **args){
   int length = 0;
   char **tmp=args;
   while (*tmp++)
     length++;
-  
-  for(int i = 0; i < length; i++)
-    free(args[i]);
-    
-  free(args);
-}
-
-int getLengthDoublePtr(char **ptr){
-  int length = 0;
-  char **tmp=ptr;
-  while (*tmp++)
-    length++;
   return length;
 }
+
+void helper(char **args){
+  char **temp = args;
+  while (*args++)
+    free(*args);
+  free(temp);
+}
+
+
