@@ -110,9 +110,8 @@ char **parsingArgv(char *lineCmd){
 }
 
 bool changeDir(char **argv){
-  const char* changeDirCmd = "cd";
   const char* cmd = argv[0];
-  bool out = strcmp(cmd, changeDirCmd) == 0;
+  bool out = strcmp(cmd, "cd") == 0;
   if (out){
     int length = getLengthDoublePtr(argv);
     
@@ -134,9 +133,8 @@ bool changeDir(char **argv){
 }
 
 bool exitTerm(char **argv){
-  const char* exitCmd = "exit";
   const char* cmd = argv[0];
-  bool out = strcmp(cmd, exitCmd) == 0;
+  bool out = strcmp(cmd, "exit") == 0;
   if (out){
     int length = getLengthDoublePtr(argv);
     if (length != 1)
@@ -161,6 +159,12 @@ bool reDirect(char **argv){
       dup2(fd, 1);
       close(fd);
       fprintf(stdout, "This will be written to output.txt\n");
+    }
+    else if (strcmp(argv[1], ">>") == 0){
+      int fd = open(argv[2], O_WRONLY | O_APPEND | O_CREAT, S_IRUSR | S_IWUSR);
+      dup2(fd, 1);
+      close(fd);
+      fprintf(stdout, "This will be appened to output.txt\n");
     }
     else if (strcmp(argv[1], "<") == 0) {
       const char *path = argv[2];
@@ -192,7 +196,7 @@ void execute(char **argv){
     //signal(SIGTSTP, handleExit);
     
     if (!reDirect(argv)){
-      execv("/bin/ls", argv);
+      execvp(argv[0], argv);
     }
       
     exit(-1);

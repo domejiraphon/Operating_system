@@ -1,15 +1,17 @@
   PID TTY          TIME CMD
     1 pts/0    00:00:00 bash
-45856 pts/0    00:00:00 gradeit.sh
-46984 pts/0    00:00:00 timeout
-46985 pts/0    00:00:00 bash
-46987 pts/0    00:00:00 nyush
-46988 pts/0    00:00:00 ps
+   56 pts/0    00:00:00 sh
+   59 pts/0    00:00:00 gradeit.sh
+ 1203 pts/0    00:00:00 timeout
+ 1204 pts/0    00:00:00 bash
+ 1206 pts/0    00:00:00 nyush
+ 1207 pts/0    00:00:00 ps
   PID TTY          TIME CMD
     1 pts/0    00:00:00 bash
-45856 pts/0    00:00:00 gradeit.sh
-46984 pts/0    00:00:00 timeout
-46985 pts/0    00:00:00 bash
-46987 pts/0    00:00:00 nyush
-46989 pts/0    00:00:00 ps
+   56 pts/0    00:00:00 sh
+   59 pts/0    00:00:00 gradeit.sh
+ 1203 pts/0    00:00:00 timeout
+ 1204 pts/0    00:00:00 bash
+ 1206 pts/0    00:00:00 nyush
+ 1208 pts/0    00:00:00 ps
 [nyush nyush-grading]$ [nyush nyush-grading]$ [nyush nyush-grading]$ 
