@@ -1,28 +1,15 @@
+#include <fcntl.h>
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include <unistd.h>
 
-int
-main(int argc, char *argv[])
-{
-    char *str1, *str2, *token, *subtoken;
-    char *saveptr1, *saveptr2;
-    int j;
+int main() {
+  
+  int fd = open("output.txt", O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
+  dup2(fd, 1);
+  
+  close(fd);
 
-   if (argc != 3) {
-        fprintf(stderr, "Usage: %s string delim",
-                argv[0]);
-        exit(EXIT_FAILURE);
-    }
+  printf("This will be written to output.txt\n");
 
-   for (j = 1, str1 = argv[1]; ; j++, str1 = NULL) {
-        token = strtok_r(str1, argv[2], &saveptr1);
-        if (token == NULL)
-            break;
-        printf("%d: %s\n", j, token);
-
-       
-    }
-
-   exit(EXIT_SUCCESS);
+  return 0;
 }

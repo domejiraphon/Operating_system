@@ -18,6 +18,7 @@ https://www.geeksforgeeks.org/strtok-strtok_r-functions-c-examples/
 #include <sys/types.h>
 #include <dirent.h>
 #include<signal.h>
+#include <fcntl.h>
 
 #include "utils.h"
 
@@ -108,18 +109,18 @@ char **parsingArgv(char *lineCmd){
   return argv;
 }
 
-bool changeDir(char **argvPtr){
+bool changeDir(char **argv){
   const char* changeDirCmd = "cd";
-  const char* cmd = argvPtr[0];
+  const char* cmd = argv[0];
   bool out = strcmp(cmd, changeDirCmd) == 0;
   if (out){
-    int length = getLengthDoublePtr(argvPtr);
+    int length = getLengthDoublePtr(argv);
     
     if (length == 1 || length > 2)
       fprintf(stderr, "Error: invalid command\n");
     else{
       //const char *path = "/2250";//
-      const char *path = argvPtr[1];
+      const char *path = argv[1];
       DIR *dir = opendir(path);
       //printf("%s\n", path);
       //printf("%d", (int)strlen(path)); exit(0);
@@ -132,12 +133,12 @@ bool changeDir(char **argvPtr){
   return out;
 }
 
-bool exitTerm(char **argvPtr){
+bool exitTerm(char **argv){
   const char* exitCmd = "exit";
-  const char* cmd = argvPtr[0];
+  const char* cmd = argv[0];
   bool out = strcmp(cmd, exitCmd) == 0;
   if (out){
-     int length = getLengthDoublePtr(argvPtr);
+    int length = getLengthDoublePtr(argv);
     if (length != 1)
       fprintf(stderr, "Error: invalid command\n");
     else
@@ -151,30 +152,53 @@ void handleExit(){
   printf("Kill child\n");
 }
 
-void execute(char *lineCmd, char **argv){
-  int argc = numArg(lineCmd);
-  char *argvArr[argc-1];
-  for (int i=1; i<=argc; i++){
-    argvArr[i] = argv[i];
-    //printf("%s\n", argv[i]);
+bool reDirect(char **argv){
+  const char* cmd = argv[0];
+  bool out = strcmp(cmd, "cat") == 0;
+  if (out) {
+    bool read = strcmp(argv[1], "<") == 0;
+    bool write = strcmp(argv[1], ">") == 0;
+    if (write){
+      int fd = open(argv[2], O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
+      dup2(fd, 1);
+      close(fd);
+      fprintf(stdout, "This will be written to output.txt\n");
+    }
+    else if (read) {
+      int fd = open(argv[2], O_RDONLY);
+      dup2(fd, 0);
+      close(fd);
+      char *out = readLine();
+      fprintf(stdout, out);
+      free(out);
+    }
+    //free(argv);
+    
   }
-  
+
+  return out;
+}
+void execute(char **argv){
   pid_t childPid = fork();
   if (childPid == 0) {
     //child
     //signal(SIGINT, handleExit);
     //signal(SIGTSTP, handleExit);
     
-    execvp(argv[0], argvArr);
+    if (!reDirect(argv)){
+      execv("/bin/ls", argv);
+    }
+      
     exit(-1);
   } else {
     // parent
     //kill(childPid, SIGINT);
     //kill(childPid, SIGTSTP);
-    
-    wait(NULL);
+    int *status=NULL;
+    waitpid(childPid, status, 0);
   }
 }
+
 void prompt(){
   while (true) {
     //print terminal current directory
@@ -187,14 +211,12 @@ void prompt(){
     
     if (!changeDir(argv) &&
         !exitTerm(argv)){
-      execute(lineCmd, argv);
+      execute(argv);
     }
     
-    free(lineCmd);
-    free_copied_args(argv, NULL);
+    //free(lineCmd);
+    //free_copied_args(argv, NULL);
   }
-  
- 
 }
 
 int main() {
