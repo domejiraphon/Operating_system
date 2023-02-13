@@ -157,6 +157,7 @@ char **copyPtr(int cut, char **argv){
   argv1[cut] = NULL;
   return argv1;
 }
+
 bool reDirect(char **argv){
   if (getLengthDoublePtr(argv) == 3 &&
       strcmp(argv[0], "cat") == 0 && 
@@ -199,17 +200,20 @@ bool reDirect(char **argv){
     }
     free(argv1);
   } 
-  
- 
   return false;
+}
+void onlyKillChild(){
+  raise(SIGTERM);
+}
+
+void doNothing(){
+  fprintf(stdout, "\n");
 }
 
 void execute(char **argv){
   pid_t childPid = fork();
+  
   if (childPid == 0) {
-    //child
-    //signal(SIGINT, handleExit);
-    //signal(SIGTSTP, handleExit);
     
     if (!reDirect(argv)){
       
@@ -219,9 +223,11 @@ void execute(char **argv){
     exit(-1);
   } else {
     // parent
-    //kill(childPid, SIGINT);
-    //kill(childPid, SIGTSTP);
+    
     int *status=NULL;
+    signal(SIGINT, doNothing);
+    signal(SIGTSTP, doNothing);
+    signal(SIGQUIT, doNothing);
     waitpid(childPid, status, 0);
   }
 }
@@ -247,7 +253,7 @@ void prompt(){
 }
 
 int main() {
-  //signal(SIGINT, prompt);
+  
   //signal(SIGTSTP, prompt);
   
   
