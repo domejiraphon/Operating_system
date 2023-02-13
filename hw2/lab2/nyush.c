@@ -150,44 +150,60 @@ void handleExit(){
   printf("Kill child\n");
 }
 
-bool reDirect(char **argv){
-  const char* cmd = argv[0];
-  bool out = strcmp(cmd, "cat") == 0;
-  if (out) {
-    if (strcmp(argv[1], ">") == 0){
-      int fd = open(argv[2], O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
-      dup2(fd, 1);
-      close(fd);
-      fprintf(stdout, "This will be written to output.txt\n");
-    }
-    else if (strcmp(argv[1], ">>") == 0){
-      int fd = open(argv[2], O_WRONLY | O_APPEND | O_CREAT, S_IRUSR | S_IWUSR);
-      dup2(fd, 1);
-      close(fd);
-      fprintf(stdout, "This will be appened to output.txt\n");
-    }
-    else if (strcmp(argv[1], "<") == 0) {
-      const char *path = argv[2];
-      bool exist = access(path, F_OK) == 0;
-      if (!exist)
-        fprintf(stderr, "Error: invalid file\n");
-      else{
-        int fd = open(argv[2], O_RDONLY);
-        dup2(fd, 0);
-        close(fd);
-        char *out=NULL;
-        while ((out=readLine())){
-          fprintf(stdout, out);
-          free(out);
-        }
-        fprintf(stdout, "\n");
-      }
-    }
-    
-  }
-
-  return out;
+char **copyPtr(int cut, char **argv){
+  char **argv1=(char **)malloc((cut+1) * sizeof(char *));
+  for (int i=0; i<cut; i++)
+    argv1[i] = argv[i];
+  argv1[cut] = NULL;
+  return argv1;
 }
+bool reDirect(char **argv){
+  if (getLengthDoublePtr(argv) == 3 &&
+      strcmp(argv[0], "cat") == 0 && 
+      strcmp(argv[1], "<") == 0){
+    const char *path = argv[2];
+    if (access(path, F_OK) != 0)
+      fprintf(stderr, "Error: invalid file\n");
+    else{
+      int fd = open(argv[2], O_RDONLY);
+      dup2(fd, 0);
+      close(fd);
+      char *out=NULL;
+      while ((out=readLine())){
+        fprintf(stdout, out);
+        free(out);
+      }
+      fprintf(stdout, "\n");
+    }
+    return true;}
+  else {
+    int argc = getLengthDoublePtr(argv);
+    int cut=0;
+    for (; cut<argc && strcmp(argv[cut], ">") != 0 &&strcmp(argv[cut], ">>"); cut++)
+      ;
+    char **argv1 = copyPtr(cut, argv);
+    if (cut != argc - 1 && argc - cut == 2){
+      int fd;
+      if (strcmp(argv[cut], ">") == 0){
+        fd = open(argv[argc - 1], 
+            O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
+      }
+      else if (strcmp(argv[cut], ">>") == 0) {
+        fd = open(argv[argc - 1], 
+            O_WRONLY | O_APPEND | O_CREAT, S_IRUSR | S_IWUSR);
+      }
+      dup2(fd, 1);
+      close(fd);
+      execvp(argv1[0], argv1);
+      return true;
+    }
+    free(argv1);
+  } 
+  
+ 
+  return false;
+}
+
 void execute(char **argv){
   pid_t childPid = fork();
   if (childPid == 0) {
@@ -196,6 +212,7 @@ void execute(char **argv){
     //signal(SIGTSTP, handleExit);
     
     if (!reDirect(argv)){
+      
       execvp(argv[0], argv);
     }
       
@@ -218,7 +235,7 @@ void prompt(){
     //read and parse Command
     char *lineCmd = readLine();
     char **argv = parsingArgv(lineCmd);
-    
+   
     if (!changeDir(argv) &&
         !exitTerm(argv)){
       execute(argv);
