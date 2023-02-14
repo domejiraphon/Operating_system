@@ -4,12 +4,21 @@
 #include <signal.h>
 #include <sys/wait.h>
 
-void sigint_handler(int signum) {
-    // do nothing
+struct queue {
+  char* arr[100];
+  int start;
+  int curSize;
+};
+void push(struct queue Q, char *lineCmd){
+  char *str = (char *)malloc((strlen(lineCmd) + 1) * sizeof(char));
+  strcpy(str, lineCmd);
+  Q.arr[curSize++] = str;
+ 
+  Q.arr[curSize] = NULL;
+  printf("%d %s\n",curSize, Q.arr[0]);//exit(0);
 }
-
-void sigtstp_handler(int signum) {
-    // do nothing
+void pop(struct queue Q){
+  free(Q.arr[Q.start++]);
 }
 
 int main() {

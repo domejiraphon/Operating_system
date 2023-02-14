@@ -13,20 +13,20 @@ https://www.gnu.org/software/libc/manual/html_node/Basic-Signal-Handling.html
 #include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
-#include <sys/types.h>
-#include <sys/wait.h>
+
 #include <stdarg.h>
-#include <sys/types.h>
+
 #include <dirent.h>
 #include<signal.h>
 #include <fcntl.h>
-
+#include <sys/types.h>
+#include <sys/wait.h>
 #include "utils.h"
 
 #define SIZE_MAX 1000
 #define BASEDIR "[nyush "
 
-int curSize=0;
+
 char *readLine(){
   char *lineCmd = (char *)malloc((SIZE_MAX) * sizeof(char));
   size_t size = SIZE_MAX;
@@ -113,10 +113,8 @@ char **parsingArgv(char *lineCmd){
 
 bool changeDir(char **argv){
   const char* cmd = argv[0];
-  bool out = strcmp(cmd, "cd") == 0;
-  if (out){
+  if (strcmp(cmd, "cd") == 0){
     int length = getLengthDoublePtr(argv);
-    
     if (length == 1 || length > 2)
       fprintf(stderr, "Error: invalid command\n");
     else{
@@ -130,26 +128,22 @@ bool changeDir(char **argv){
       else
         fprintf(stderr, "Error: invalid directory\n");
     }
+    return true;
   }
-  return out;
+  return false;
 }
 
 bool exitTerm(char **argv){
   const char* cmd = argv[0];
-  bool out = strcmp(cmd, "exit") == 0;
-  if (out){
+  if (strcmp(cmd, "exit") == 0){
     int length = getLengthDoublePtr(argv);
     if (length != 1)
       fprintf(stderr, "Error: invalid command\n");
     else
       exit(-1);
+    return true;
   }
-    
-  return out;
-}
-
-void handleExit(){
-  printf("Kill child\n");
+  return false;
 }
 
 char **copyPtr(int cut, char **argv){
@@ -178,7 +172,8 @@ bool reDirect(char **argv){
       }
       fprintf(stdout, "\n");
     }
-    return true;}
+    return true;
+  }
   else {
     int argc = getLengthDoublePtr(argv);
     int cut=0;
@@ -214,9 +209,6 @@ void push(struct queue Q, char *lineCmd){
   char *str = (char *)malloc((strlen(lineCmd) + 1) * sizeof(char));
   strcpy(str, lineCmd);
   Q.arr[curSize++] = str;
- 
-  //Q.arr[curSize] = NULL;
-  
 }
 void pop(struct queue Q){
   free(Q.arr[Q.start++]);
@@ -255,14 +247,12 @@ bool checkJob(char **argv, struct queue Q){
   const char* cmd = argv[0];
   bool out = strcmp(cmd, "jobs") == 0;
   if (out){
-    
-    for (int i=0; i<100 && Q.arr[i+Q.start]; i++){
+    for (int i=0; i<100 && Q.arr[i+Q.start]; i++)
       fprintf(stdout, "[%d] %s", i+1, Q.arr[Q.start+i]);
-    }
   }
   return out;
-  
 }
+
 void prompt(){
   struct queue Q;
   Q.start=0;
