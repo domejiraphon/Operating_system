@@ -1,32 +1,45 @@
-#include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
+#include <signal.h>
+#include <sys/wait.h>
+
+void sigint_handler(int signum) {
+    // do nothing
+}
+
+void sigtstp_handler(int signum) {
+    // do nothing
+}
 
 int main() {
-    int fildes[2];
-    const int BSIZE = 100;
-    char buf[BSIZE];
-    ssize_t nbytes;
-    int status;
+    // ignore SIGINT and SIGTSTP signals in parent process
+    signal(SIGINT, SIG_IGN);
+    signal(SIGTSTP, SIG_IGN);
 
-    status = pipe(fildes);
-    
-    switch (fork()) {
-    case -1: /* Handle error */
-        break;
-
-    case 0:  /* Child - reads from pipe */
-        close(fildes[1]);                       /* Write end is unused */
-        nbytes = read(fildes[0], buf, BSIZE);   /* Get data from pipe */
-        /* At this point, a further read would see end-of-file ... */
-        close(fildes[0]);                       /* Finished with pipe */
-        exit(EXIT_SUCCESS);
-
-    default:  /* Parent - writes to pipe */
-        close(fildes[0]);                       /* Read end is unused */
-        write(fildes[1], "Hello world\n", 12);  /* Write data on pipe */
-        close(fildes[1]);                       /* Child will see EOF */
-        exit(EXIT_SUCCESS);
+    // fork child process
+    pid_t pid = fork();
+    if (pid == -1) {
+        perror("fork");
+        exit(1);
+    } else if (pid == 0) {
+        // child process
+        // execute a command
+        execlp("sleep", "sleep", "10", NULL);
+        exit(0);
+    } else {
+        // parent process
+        // wait for child to finish or stop
+        int status;
+        waitpid(pid, &status, WUNTRACED);
+        if (WIFSTOPPED(status)) {
+            // child process has stopped
+            printf("Child process stopped with signal %d\n", WSTOPSIG(status));
+        } else {
+            // child process has terminated
+            printf("Child process finished with status %d\n", status);
+        }
     }
 
+    return 0;
 }

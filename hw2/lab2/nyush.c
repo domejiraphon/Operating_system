@@ -5,6 +5,7 @@ https://www.programiz.com/c-programming/library-function/string.h/strcmp
 https://stackoverflow.com/questions/12510874/how-can-i-check-if-a-directory-exists
 https://www.geeksforgeeks.org/signals-c-language/
 https://www.geeksforgeeks.org/strtok-strtok_r-functions-c-examples/
+https://www.gnu.org/software/libc/manual/html_node/Basic-Signal-Handling.html
 */
 #include <ctype.h>
 #include <stdio.h>
@@ -25,6 +26,7 @@ https://www.geeksforgeeks.org/strtok-strtok_r-functions-c-examples/
 #define SIZE_MAX 1000
 #define BASEDIR "[nyush "
 
+int curSize=0;
 char *readLine(){
   char *lineCmd = (char *)malloc((SIZE_MAX) * sizeof(char));
   size_t size = SIZE_MAX;
@@ -202,15 +204,28 @@ bool reDirect(char **argv){
   } 
   return false;
 }
-void onlyKillChild(){
-  raise(SIGTERM);
+
+struct queue {
+  char** arr;
+  int start;
+  int curSize;
+};
+void push(struct queue Q, char *lineCmd){
+  char *str = (char *)malloc((strlen(lineCmd) + 1) * sizeof(char));
+  strcpy(str, lineCmd);
+  Q.arr[curSize++] = str;
+ 
+  //Q.arr[curSize] = NULL;
+  
+}
+void pop(struct queue Q){
+  free(Q.arr[Q.start++]);
 }
 
-void doNothing(){
+void nextRound(){
   fprintf(stdout, "\n");
 }
-
-void execute(char **argv){
+void execute(char **argv, char *lineCmd, struct queue Q){
   pid_t childPid = fork();
   
   if (childPid == 0) {
@@ -224,27 +239,47 @@ void execute(char **argv){
   } else {
     // parent
     
-    int *status=NULL;
-    signal(SIGINT, doNothing);
-    signal(SIGTSTP, doNothing);
-    signal(SIGQUIT, doNothing);
-    waitpid(childPid, status, 0);
+    int status=0;
+    signal(SIGINT, nextRound);
+    signal(SIGTSTP, nextRound);
+    signal(SIGQUIT, nextRound);
+ 
+    waitpid(childPid, &status, WUNTRACED);
+    
+    if (WIFSTOPPED(status) == 1){
+      push(Q, lineCmd);
+    }
   }
 }
-
+bool checkJob(char **argv, struct queue Q){
+  const char* cmd = argv[0];
+  bool out = strcmp(cmd, "jobs") == 0;
+  if (out){
+    
+    for (int i=0; i<100 && Q.arr[i+Q.start]; i++){
+      fprintf(stdout, "[%d] %s", i+1, Q.arr[Q.start+i]);
+    }
+  }
+  return out;
+  
+}
 void prompt(){
+  struct queue Q;
+  Q.start=0;
+  Q.curSize = 0;
+  Q.arr = (char **)malloc((100) * sizeof(char *));
   while (true) {
     //print terminal current directory
     header();
     
-
     //read and parse Command
     char *lineCmd = readLine();
     char **argv = parsingArgv(lineCmd);
    
     if (!changeDir(argv) &&
-        !exitTerm(argv)){
-      execute(argv);
+        !exitTerm(argv) &&
+        !checkJob(argv, Q)){
+      execute(argv, lineCmd, Q);
     }
     
     free(lineCmd);

@@ -1,19 +1,1 @@
-Makefile
-append.txt
-append2.txt
-append3.txt
-consumer
-input.txt
-libnosystem.so
-nyush
-nyush.c
-nyush.o
-print_args
-print_numbers
-print_numbers_stopped
-producer
-subdir
-utils.c
-utils.h
-utils.o
 [nyush nyush-grading]$ [nyush nyush-grading]$ 

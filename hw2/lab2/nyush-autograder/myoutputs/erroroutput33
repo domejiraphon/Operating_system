@@ -1,12 +1,10 @@
-error: process ID list syntax error
+error: garbage option
 
 Usage:
- | [options]
+ ps [options]
 
- Try '| --help <simple|list|output|threads|misc|all>'
-  or '| --help <s|l|o|t|m|a>'
+ Try 'ps --help <simple|list|output|threads|misc|all>'
+  or 'ps --help <s|l|o|t|m|a>'
  for additional help text.
 
 For more details see ps(1).
-Error: invalid command
-free(): double free detected in tcache 2

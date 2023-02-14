@@ -1,1 +1,4 @@
-hello\nworld\nhello | sort | uniq
+hello
+world
+hello | sort | uniq
+[nyush nyush-grading]$ [nyush nyush-grading]$ 
