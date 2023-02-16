@@ -26,7 +26,6 @@ https://www.gnu.org/software/libc/manual/html_node/Basic-Signal-Handling.html
 #define SIZE_MAX 1000
 #define BASEDIR "[nyush "
 
-
 char *readLine(){
   char *lineCmd = (char *)malloc((SIZE_MAX) * sizeof(char));
   size_t size = SIZE_MAX;
@@ -39,31 +38,29 @@ char *readLine(){
 void header(){
   char *buf = (char *)malloc((SIZE_MAX) * sizeof(char));
   getcwd(buf, SIZE_MAX);
+  
+  char *saveptr=buf;
+  char *token = buf;
+  
+  char *last = "/";
+  for (; ; buf = NULL) {
+    token = strtok_r(buf, "/", &saveptr);
+    if (!token)
+      break;
+    last = token;
+  }
   char *base = (char *)malloc((SIZE_MAX) * sizeof(char));
   
   strcpy(base, BASEDIR);
-  int stringLength = strlen(buf);
-  int cur = strlen(base);
-  int k = cur;
-  if (stringLength == 1 && buf[0] == '/')
-    base[k++] = '/';
-  else {
-    for (int i=0; i < stringLength; i++){
-      if (buf[i] == '/'){
-        k = cur; continue;
-      }
-      base[k++] = buf[i];
-    }
-  }
-  free(buf);
-  base[k] = '\0';
-  const char *end = "]$ ";
-  strcat(base, end);
-  fprintf(stdout, base);
+  strcat(base, last);
+  strcat(base, "]$ ");
+  printf("%s", base);
+  fflush(stdout);
   free(base);
 }
 
 int numArg(const char *lineCmd){
+
   int argc=0;
   const char *delim = " ";
   
@@ -78,7 +75,6 @@ int numArg(const char *lineCmd){
 }
 
 char **parsingArgv(char *lineCmd){
-  
   int argc = numArg(lineCmd);
   
   char *str= (char *)malloc((strlen(lineCmd) + 1) * sizeof(char));
@@ -115,8 +111,10 @@ bool changeDir(char **argv){
   const char* cmd = argv[0];
   if (strcmp(cmd, "cd") == 0){
     int length = getLengthDoublePtr(argv);
-    if (length == 1 || length > 2)
-      fprintf(stderr, "Error: invalid command\n");
+    if (length == 1 || length > 2){
+      printf("Error: invalid command\n");
+      fflush(stderr);
+    }
     else{
       //const char *path = "/2250";//
       const char *path = argv[1];
@@ -125,8 +123,10 @@ bool changeDir(char **argv){
       //printf("%d", (int)strlen(path)); exit(0);
       if (dir)
         chdir(path);
-      else
-        fprintf(stderr, "Error: invalid directory\n");
+      else{
+        printf("Error: invalid directory\n");
+        fflush(stderr);
+      }
     }
     return true;
   }
@@ -137,10 +137,11 @@ bool exitTerm(char **argv){
   const char* cmd = argv[0];
   if (strcmp(cmd, "exit") == 0){
     int length = getLengthDoublePtr(argv);
-    if (length != 1)
-      fprintf(stderr, "Error: invalid command\n");
-    else
-      exit(-1);
+    if (length > 2){
+      printf("Error: invalid command\n");
+      fflush(stderr);
+    }
+    exit(0);
     return true;
   }
   return false;
@@ -159,18 +160,22 @@ bool reDirect(char **argv){
       strcmp(argv[0], "cat") == 0 && 
       strcmp(argv[1], "<") == 0){
     const char *path = argv[2];
-    if (access(path, F_OK) != 0)
-      fprintf(stderr, "Error: invalid file\n");
+    if (access(path, F_OK) != 0){
+      printf("Error: invalid file\n" );
+      fflush(stderr);
+    }
     else{
       int fd = open(argv[2], O_RDONLY);
       dup2(fd, 0);
       close(fd);
       char *out=NULL;
       while ((out=readLine())){
-        fprintf(stdout, out);
+        printf("%s", out);
+        fflush(stdout);
         free(out);
       }
-      fprintf(stdout, "\n");
+      printf("\n");
+      fflush(stdout);
     }
     return true;
   }
@@ -200,22 +205,10 @@ bool reDirect(char **argv){
   return false;
 }
 
-struct queue {
-  char** arr;
-  int start;
-  int curSize;
-};
-void push(struct queue Q, char *lineCmd){
-  char *str = (char *)malloc((strlen(lineCmd) + 1) * sizeof(char));
-  strcpy(str, lineCmd);
-  Q.arr[curSize++] = str;
-}
-void pop(struct queue Q){
-  free(Q.arr[Q.start++]);
-}
 
 void nextRound(){
-  fprintf(stdout, "\n");
+  //printf("\n");
+  //fflush(stdout);
 }
 void execute(char **argv, char *lineCmd, struct queue Q){
   pid_t childPid = fork();
@@ -227,7 +220,7 @@ void execute(char **argv, char *lineCmd, struct queue Q){
       execvp(argv[0], argv);
     }
       
-    exit(-1);
+    //exit(-1);
   } else {
     // parent
     
@@ -243,44 +236,51 @@ void execute(char **argv, char *lineCmd, struct queue Q){
     }
   }
 }
+
 bool checkJob(char **argv, struct queue Q){
   const char* cmd = argv[0];
   bool out = strcmp(cmd, "jobs") == 0;
   if (out){
-    for (int i=0; i<100 && Q.arr[i+Q.start]; i++)
-      fprintf(stdout, "[%d] %s", i+1, Q.arr[Q.start+i]);
+    for (int i=0; i<100 && Q.arr[i+Q.start]; i++){
+      printf("[%d] %s", i+1, Q.arr[Q.start+i]);
+      fflush(stdout);
+    }
   }
   return out;
 }
 
 void prompt(){
+  
   struct queue Q;
   Q.start=0;
   Q.curSize = 0;
   Q.arr = (char **)malloc((100) * sizeof(char *));
+  
   while (true) {
     //print terminal current directory
     header();
     
     //read and parse Command
+    
     char *lineCmd = readLine();
+    if (!lineCmd)
+      break;
     char **argv = parsingArgv(lineCmd);
-   
+    
+  
     if (!changeDir(argv) &&
-        !exitTerm(argv) &&
+        !exitTerm(argv) && 
         !checkJob(argv, Q)){
       execute(argv, lineCmd, Q);
     }
     
     free(lineCmd);
     free_copied_args(argv, NULL);
+    
   }
 }
 
 int main() {
-  
-  //signal(SIGTSTP, prompt);
-  
   
   prompt();
   

@@ -5,6 +5,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include <stdarg.h>
+#include "utils.h"
 
 void helper(char **args);
 void free_copied_args(char **fmt, ...){
@@ -30,6 +31,15 @@ void helper(char **args){
   while (*args++)
     free(*args);
   free(temp);
+}
+
+void push(struct queue Q, char *lineCmd){
+  char *str = (char *)malloc((strlen(lineCmd) + 1) * sizeof(char));
+  strcpy(str, lineCmd);
+  Q.arr[Q.curSize++] = str;
+}
+void pop(struct queue Q){
+  free(Q.arr[Q.start++]);
 }
 
 

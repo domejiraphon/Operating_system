@@ -1,2 +1,2 @@
-subdir
-[nyush nyush-grading]$ [nyush subdir]$ [nyush subdir]$ 
+[nyush nyush-grading]$ [nyush subdir]$ subdir
+[nyush subdir]$ 
