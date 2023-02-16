@@ -6,6 +6,7 @@ https://stackoverflow.com/questions/12510874/how-can-i-check-if-a-directory-exis
 https://www.geeksforgeeks.org/signals-c-language/
 https://www.geeksforgeeks.org/strtok-strtok_r-functions-c-examples/
 https://www.gnu.org/software/libc/manual/html_node/Basic-Signal-Handling.html
+https://www.geeksforgeeks.org/c-program-list-files-sub-directories-directory/
 */
 #include <ctype.h>
 #include <stdio.h>
@@ -201,8 +202,85 @@ void reDirect(char **argv){
   }
   
   argv1[moreIdx - skip] = NULL;
-  execvp(argv1[0], argv1);
-  free(argv1);
+  bool slashExist=false;
+  int length = strlen(argv1[0]);
+  for (int i=0; i<length && !slashExist; i++){
+    if (argv1[0][i] == '/')
+      slashExist = true;
+  }
+  char *pathToLib=NULL;
+  char *program=NULL;
+  pathToLib = (char *)(malloc(SIZE_MAX * sizeof(char)));
+  char *tmp = (char *)(malloc(SIZE_MAX * sizeof(char)));
+  strcpy(tmp, argv1[0]);
+  if (argv1[0][0] == '/'){
+    strcpy(pathToLib, argv1[0]);
+    for (int i=length - 1; i >= 0; i--){
+      if (argv1[0][i] == '/'){
+        pathToLib[i] = '\0';
+        break;
+      }
+    }
+    
+    char *saveptr=tmp;
+    char *token = tmp;
+    
+    for (; ;tmp = NULL) {
+      token = strtok_r(tmp, "/", &saveptr);
+      if (!token)
+        break;
+      program = token;
+    }
+
+  }
+  else if (slashExist){
+    getcwd(pathToLib, SIZE_MAX);
+    int last=length-1;
+    for (; last>=0 && tmp[last] != '/'; last--)
+      ;
+    char sl = '/';
+    strncat(pathToLib, &sl, 1);
+    for (int i=0; i<length; i++)
+      if (i < last)
+        strncat(pathToLib, &tmp[i], 1);
+        //strcat(pathToLib, tmp[i]);
+    char *saveptr=tmp;
+    char *token = tmp;
+    
+    for (; ;tmp = NULL) {
+      token = strtok_r(tmp, "/", &saveptr);
+      if (!token)
+        break;
+      program = token;
+    }
+
+  }
+  else {
+    strcpy(pathToLib, "/usr/bin");
+    program = tmp;
+  }
+  
+  
+  DIR *lib = opendir(pathToLib);
+  struct dirent *libFile = NULL;
+  strcat(pathToLib, "/");
+  strcat(pathToLib, program);
+  argv1[0] = pathToLib;
+  
+  
+  while ((libFile = readdir(lib))){
+    //printf("%s\n", libFile ->d_name);
+    if (!strcmp(libFile->d_name, program)){
+      execv(argv1[0], argv1);
+      free(argv1);
+      free(pathToLib);
+      free(tmp);
+      return;
+    }
+  }
+  printf("Error: invalid program\n");
+  fflush(stderr);
+  
 }
 void nextRound(){
   //printf("\n");
