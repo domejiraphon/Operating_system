@@ -147,65 +147,63 @@ bool exitTerm(char **argv){
   return false;
 }
 
-char **copyPtr(int cut, char **argv){
-  char **argv1=(char **)malloc((cut+1) * sizeof(char *));
-  for (int i=0; i<cut; i++)
-    argv1[i] = argv[i];
-  argv1[cut] = NULL;
-  return argv1;
-}
-
-bool reDirect(char **argv){
-  if (getLengthDoublePtr(argv) == 3 &&
-      strcmp(argv[0], "cat") == 0 && 
-      strcmp(argv[1], "<") == 0){
-    const char *path = argv[2];
-    if (access(path, F_OK) != 0){
-      printf("Error: invalid file\n" );
-      fflush(stderr);
+void reDirect(char **argv){
+  int moreIdx=0;
+  int argc = getLengthDoublePtr(argv);
+  bool outDirect = false;
+  for (; moreIdx < argc; moreIdx++){
+    if (strcmp(argv[moreIdx], ">") == 0 ||
+        strcmp(argv[moreIdx], ">>") == 0){
+      outDirect = true;
+      break;
     }
-    else{
-      int fd = open(argv[2], O_RDONLY);
-      dup2(fd, 0);
-      close(fd);
-      char *out=NULL;
-      while ((out=readLine())){
-        printf("%s", out);
-        fflush(stdout);
-        free(out);
-      }
-      printf("\n");
-      fflush(stdout);
-    }
-    return true;
   }
-  else {
-    int argc = getLengthDoublePtr(argv);
-    int cut=0;
-    for (; cut<argc && strcmp(argv[cut], ">") != 0 &&strcmp(argv[cut], ">>"); cut++)
-      ;
-    char **argv1 = copyPtr(cut, argv);
-    if (cut != argc - 1 && argc - cut == 2){
-      int fd;
-      if (strcmp(argv[cut], ">") == 0){
-        fd = open(argv[argc - 1], 
-            O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
-      }
-      else if (strcmp(argv[cut], ">>") == 0) {
-        fd = open(argv[argc - 1], 
-            O_WRONLY | O_APPEND | O_CREAT, S_IRUSR | S_IWUSR);
-      }
-      dup2(fd, 1);
-      close(fd);
-      execvp(argv1[0], argv1);
-      return true;
+  if (outDirect){
+    char *file = argv[moreIdx + 1];
+    if (!file){
+      printf("Error: invalid command\n");
+      fflush(stderr);
+      exit(0);
     }
-    free(argv1);
-  } 
-  return false;
+    int fd;
+    if (strcmp(argv[moreIdx], ">") == 0){
+      fd = open(file, 
+          O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
+    }
+    else if (strcmp(argv[moreIdx], ">>") == 0) {
+      fd = open(file, 
+          O_WRONLY | O_APPEND | O_CREAT, S_IRUSR | S_IWUSR);
+    }
+    dup2(fd, 1);
+    close(fd);
+  }
+  char **argv1=(char **)malloc((moreIdx+1) * sizeof(char *));
+  int i=0;
+  int skip=0;
+  
+  for (; i<moreIdx; i++){
+    if (strcmp(argv[i], "<") == 0){
+      skip++;
+      const char *file = argv[i + 1];
+      if (!file){
+        printf("Error: invalid command\n");
+        fflush(stderr);
+        exit(0);
+      }
+      if (access(file, F_OK) != 0){
+        printf("Error: invalid file\n" );
+        fflush(stderr);
+        exit(0);
+      }
+      continue;
+    }
+    argv1[i-skip] = argv[i];
+  }
+  
+  argv1[moreIdx - skip] = NULL;
+  execvp(argv1[0], argv1);
+  free(argv1);
 }
-
-
 void nextRound(){
   //printf("\n");
   //fflush(stdout);
@@ -215,13 +213,12 @@ void execute(char **argv, char *lineCmd, struct queue Q){
   
   if (childPid == 0) {
     
-    if (!reDirect(argv)){
-      
-      execvp(argv[0], argv);
-    }
-      
+    
+    reDirect(argv);
+    exit(0);
     //exit(-1);
-  } else {
+  } 
+  else {
     // parent
     
     int status=0;
@@ -267,15 +264,15 @@ void prompt(){
       break;
     char **argv = parsingArgv(lineCmd);
     
-  
     if (!changeDir(argv) &&
         !exitTerm(argv) && 
         !checkJob(argv, Q)){
+      
       execute(argv, lineCmd, Q);
     }
     
-    free(lineCmd);
-    free_copied_args(argv, NULL);
+    //free(lineCmd);
+    //free_copied_args(argv, NULL);
     
   }
 }
