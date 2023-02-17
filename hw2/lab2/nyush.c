@@ -7,6 +7,7 @@ https://www.geeksforgeeks.org/signals-c-language/
 https://www.geeksforgeeks.org/strtok-strtok_r-functions-c-examples/
 https://www.gnu.org/software/libc/manual/html_node/Basic-Signal-Handling.html
 https://www.geeksforgeeks.org/c-program-list-files-sub-directories-directory/
+https://stackoverflow.com/questions/39002052/how-i-can-print-to-stderr-in-c
 */
 #include <ctype.h>
 #include <stdio.h>
@@ -112,7 +113,7 @@ bool changeDir(char **argv){
   if (strcmp(cmd, "cd") == 0){
     int length = getLengthDoublePtr(argv);
     if (length == 1 || length > 2){
-      printf("Error: invalid command\n");
+      fprintf(stderr, "Error: invalid command\n");
       fflush(stderr);
     }
     else{
@@ -124,7 +125,7 @@ bool changeDir(char **argv){
       if (dir)
         chdir(path);
       else{
-        printf("Error: invalid directory\n");
+        fprintf(stderr, "Error: invalid directory\n");
         fflush(stderr);
       }
     }
@@ -133,13 +134,20 @@ bool changeDir(char **argv){
   return false;
 }
 
-bool exitTerm(char **argv){
+bool exitTerm(char **argv, struct Node *head, struct Node *tail){
   const char* cmd = argv[0];
   if (strcmp(cmd, "exit") == 0){
     int length = getLengthDoublePtr(argv);
-    if (length > 2){
-      printf("Error: invalid command\n");
+   
+    if (length != 1){
+      fprintf(stderr, "Error: invalid command\n");
       fflush(stderr);
+      return true;
+    }
+    else if (!empty(head, tail)){
+      fprintf(stderr, "Error: there are suspended jobs\n");
+      fflush(stderr);
+      return true;
     }
     exit(0);
     return true;
@@ -157,12 +165,12 @@ void locatingProgram(char **argv, int moreIdx){
       skip++;
       const char *file = argv[i + 1];
       if (!file){
-        printf("Error: invalid command\n");
+        fprintf(stderr, "Error: invalid command\n");
         fflush(stderr);
         exit(0);
       }
       if (access(file, F_OK) != 0){
-        printf("Error: invalid file\n" );
+        fprintf(stderr, "Error: invalid file\n" );
         fflush(stderr);
         exit(0);
       }
@@ -248,7 +256,7 @@ void locatingProgram(char **argv, int moreIdx){
       return;
     }
   }
-  printf("Error: invalid program\n");
+  fprintf(stderr, "Error: invalid program\n");
   fflush(stderr);
 }
 
@@ -270,7 +278,7 @@ bool reDirect(char **argv){
   if (outDirect){
     char *file = argv[moreIdx + 1];
     if (!file){
-      printf("Error: invalid command\n");
+      fprintf(stderr, "Error: invalid command\n");
       fflush(stderr);
       exit(0);
     }
@@ -293,20 +301,27 @@ bool reDirect(char **argv){
 void pipeExec(char **argv){
   int argc = getLengthDoublePtr(argv);
   int pipeIdx=0;
+  
   while (pipeIdx < argc){
     for (; pipeIdx<argc && strcmp(argv[pipeIdx], "|"); pipeIdx++)
       ;
     if (pipeIdx == argc)
       break;
+    if (pipeIdx == 0){
+      fprintf(stderr, "Error: invalid command\n");
+      fflush(stderr);
+    }
     int fildes[2];
     char **argv1, **argv2;
     pipe(fildes);
     if (!fork()){
       //first
+      
       close(1);
       dup2(fildes[1], 1);
       close(fildes[0]);
       close(fildes[1]);
+     
       argv1 = (char **)(malloc((pipeIdx + 1) * sizeof(char *)));
       for (int i=0; i<pipeIdx; i++)
         argv1[i] = argv[i];
@@ -339,10 +354,11 @@ void pipeExec(char **argv){
   
  
 }
+
 void nextRound(){
 }
 
-void execute(char **argv, char *lineCmd, struct queue Q){
+void execute(char **argv, char *lineCmd, struct Node *head){
   pid_t childPid = fork();
   
   if (childPid == 0) {
@@ -365,30 +381,57 @@ void execute(char **argv, char *lineCmd, struct queue Q){
     waitpid(childPid, &status, WUNTRACED);
     
     if (WIFSTOPPED(status) == 1){
-      push(Q, lineCmd);
+      addNode(head, lineCmd, childPid);
+     
     }
   }
 }
 
-bool checkJob(char **argv, struct queue Q){
+bool checkJob(char **argv, struct Node *head, struct Node *tail){
   const char* cmd = argv[0];
-  bool out = strcmp(cmd, "jobs") == 0;
-  if (out){
-    for (int i=0; i<100 && Q.arr[i+Q.start]; i++){
-      printf("[%d] %s", i+1, Q.arr[Q.start+i]);
-      fflush(stdout);
+
+  if (!strcmp(cmd, "jobs")){
+    int argc = getLengthDoublePtr(argv);
+    if (argc != 1){
+      fprintf(stderr, "Error: invalid command\n");
+      fflush(stderr);
     }
+    else
+      printJobs(head, tail);
+    return true;
   }
-  return out;
+  return false;
+}
+
+bool checkFg(char **argv, struct Node* tail){
+  const char* cmd = argv[0];
+  if (!strcmp(cmd, "fg")){
+    int argc = getLengthDoublePtr(argv);
+    if (argc != 2){
+      fprintf(stderr, "Error: invalid command\n");
+      fflush(stderr);
+    }
+    else {
+      //int id = *argv[1] - '0';
+      pid_t resumePid = removeNode(tail, *argv[1] - '0');
+      if (resumePid != -1)
+        kill(resumePid, SIGCONT);
+      else{
+        fprintf(stderr, "Error: invalid job\n");
+        fflush(stderr);
+      }
+    }
+    return true;
+  }
+  return false;
 }
 
 void prompt(){
   
-  struct queue Q;
-  Q.start=0;
-  Q.curSize = 0;
-  Q.arr = (char **)malloc((100) * sizeof(char *));
-  
+  struct Node *head = (struct Node *)malloc(sizeof(struct Node));
+  struct Node *tail = (struct Node *)malloc(sizeof(struct Node));
+  head -> next = tail;
+  tail -> prev = head;
   while (true) {
     //print terminal current directory
     header();
@@ -401,16 +444,18 @@ void prompt(){
     char **argv = parsingArgv(lineCmd, " ");
     
     if (!changeDir(argv) &&
-        !exitTerm(argv) && 
-        !checkJob(argv, Q)){
+        !exitTerm(argv, head, tail) && 
+        !checkJob(argv, head, tail) &&
+        !checkFg(argv, tail)){
       
-      execute(argv, lineCmd, Q);
+      execute(argv, lineCmd, head);
     }
     
     //free(lineCmd);
     //free_copied_args(argv, NULL);
     
   }
+  clearList(head);
 }
 
 int main() {

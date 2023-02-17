@@ -1,1 +1,2 @@
-/usr/bin/fg: line 2: fg: no job control
+Error: there are suspended jobs
+Error: there are suspended jobs
