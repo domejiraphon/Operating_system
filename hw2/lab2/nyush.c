@@ -293,44 +293,50 @@ bool reDirect(char **argv){
 void pipeExec(char **argv){
   int argc = getLengthDoublePtr(argv);
   int pipeIdx=0;
-  for (; pipeIdx<argc && strcmp(argv[pipeIdx], "|"); pipeIdx++)
-    ;
-  
-  //char **argv2 = (char **)(malloc((argc - pipeIdx) * sizeof(char *)));
-  int fildes[2];
-  pipe(fildes);
-  
-  if (!fork()){
-    close(1);
-    dup2(fildes[1], 1);
-    close(fildes[0]);
-    close(fildes[1]);
-    char **argv1 = (char **)(malloc((pipeIdx + 1) * sizeof(char *)));
-    for (int i=0; i<pipeIdx; i++)
-      argv1[i] = argv[i];
-    
-    argv1[pipeIdx] = NULL;
-    //execvp(argv1[0], argv1);
-    //locatingProgram(argv1, pipeIdx);
-    reDirect(argv1);
-    free_copied_args(argv1);
-  }
-  else {
-    close(0);
-    dup2(fildes[0], 0);
-    close(fildes[0]);
-    close(fildes[1]);
-    char **argv2 = (char **)(malloc((argc - pipeIdx + 1) * sizeof(char *)));
-    for (int i=0; i<argc - pipeIdx; i++){
-      argv2[i] = argv[i + pipeIdx + 1];
-    }
+  while (pipeIdx < argc){
+    for (; pipeIdx<argc && strcmp(argv[pipeIdx], "|"); pipeIdx++)
+      ;
+    if (pipeIdx == argc)
+      break;
+    int fildes[2];
+    char **argv1, **argv2;
+    pipe(fildes);
+    if (!fork()){
+      //first
+      close(1);
+      dup2(fildes[1], 1);
+      close(fildes[0]);
+      close(fildes[1]);
+      argv1 = (char **)(malloc((pipeIdx + 1) * sizeof(char *)));
+      for (int i=0; i<pipeIdx; i++)
+        argv1[i] = argv[i];
       
-    argv2[argc - pipeIdx] = NULL;
-    //execvp(argv2[0], argv2);
-    //locatingProgram(argv2, argc - pipeIdx);
-    reDirect(argv2);
-    free_copied_args(argv2);
+      argv1[pipeIdx] = NULL;
+   
+      reDirect(argv1);
+    }
+    else {
+      //second
+      close(0);
+      dup2(fildes[0], 0);
+      close(fildes[0]);
+      close(fildes[1]);
+      argv2 = (char **)(malloc((argc - pipeIdx + 1) * sizeof(char *)));
+      for (int i=0; i<argc - pipeIdx; i++){
+        argv2[i] = argv[i + pipeIdx + 1];
+      }
+        
+      argv2[argc - pipeIdx] = NULL;
+     
+      reDirect(argv2);
+    }
+    free_copied_args(argv1, argv2, NULL);
+    pipeIdx++;
+    break;
   }
+  
+  
+  
  
 }
 void nextRound(){
