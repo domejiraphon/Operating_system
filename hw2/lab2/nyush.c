@@ -75,7 +75,7 @@ int numArg(const char *lineCmd){
   return argc;
 }
 
-char **parsingArgv(char *lineCmd){
+char **parsingArgv(char *lineCmd, const char *delim){
   int argc = numArg(lineCmd);
   
   char *str= (char *)malloc((strlen(lineCmd) + 1) * sizeof(char));
@@ -85,7 +85,6 @@ char **parsingArgv(char *lineCmd){
   
   char *saveptr=str;
   char *token = lineCmd;
-  const char *delim = " ";
   
   for (int j=0; ; j++, str = NULL) {
     token = strtok_r(str, delim, &saveptr);
@@ -148,36 +147,7 @@ bool exitTerm(char **argv){
   return false;
 }
 
-void reDirect(char **argv){
-  int moreIdx=0;
-  int argc = getLengthDoublePtr(argv);
-  bool outDirect = false;
-  for (; moreIdx < argc; moreIdx++){
-    if (strcmp(argv[moreIdx], ">") == 0 ||
-        strcmp(argv[moreIdx], ">>") == 0){
-      outDirect = true;
-      break;
-    }
-  }
-  if (outDirect){
-    char *file = argv[moreIdx + 1];
-    if (!file){
-      printf("Error: invalid command\n");
-      fflush(stderr);
-      exit(0);
-    }
-    int fd;
-    if (strcmp(argv[moreIdx], ">") == 0){
-      fd = open(file, 
-          O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
-    }
-    else if (strcmp(argv[moreIdx], ">>") == 0) {
-      fd = open(file, 
-          O_WRONLY | O_APPEND | O_CREAT, S_IRUSR | S_IWUSR);
-    }
-    dup2(fd, 1);
-    close(fd);
-  }
+void locatingProgram(char **argv, int moreIdx){
   char **argv1=(char **)malloc((moreIdx+1) * sizeof(char *));
   int i=0;
   int skip=0;
@@ -280,7 +250,87 @@ void reDirect(char **argv){
   }
   printf("Error: invalid program\n");
   fflush(stderr);
+}
+
+bool reDirect(char **argv){
+  int moreIdx=0;
+  int argc = getLengthDoublePtr(argv);
+  for (int i=0; i<argc; i++)
+    if (!strcmp(argv[i], "|"))
+      return false;
   
+  bool outDirect = false;
+  for (; moreIdx < argc; moreIdx++){
+    if (strcmp(argv[moreIdx], ">") == 0 ||
+        strcmp(argv[moreIdx], ">>") == 0){
+      outDirect = true;
+      break;
+    }
+  }
+  if (outDirect){
+    char *file = argv[moreIdx + 1];
+    if (!file){
+      printf("Error: invalid command\n");
+      fflush(stderr);
+      exit(0);
+    }
+    int fd;
+    if (strcmp(argv[moreIdx], ">") == 0){
+      fd = open(file, 
+          O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
+    }
+    else if (strcmp(argv[moreIdx], ">>") == 0) {
+      fd = open(file, 
+          O_WRONLY | O_APPEND | O_CREAT, S_IRUSR | S_IWUSR);
+    }
+    dup2(fd, 1);
+    close(fd);
+  }
+  locatingProgram(argv, moreIdx);
+  return true;
+}
+
+void pipeExec(char **argv){
+  int argc = getLengthDoublePtr(argv);
+  int pipeIdx=0;
+  for (; pipeIdx<argc && strcmp(argv[pipeIdx], "|"); pipeIdx++)
+    ;
+  
+  //char **argv2 = (char **)(malloc((argc - pipeIdx) * sizeof(char *)));
+  int fildes[2];
+  pipe(fildes);
+  
+  if (!fork()){
+    close(1);
+    dup2(fildes[1], 1);
+    close(fildes[0]);
+  
+    char **argv1 = (char **)(malloc((pipeIdx + 1) * sizeof(char *)));
+    for (int i=0; i<pipeIdx; i++)
+      argv1[i] = argv[i];
+    
+    argv1[pipeIdx] = NULL;
+    //execvp(argv1[0], argv1);
+    //locatingProgram(argv1, pipeIdx);
+    reDirect(argv1);
+    free_copied_args(argv1);
+  }
+  else {
+    close(fildes[1]);  
+    dup2(fildes[0], 0);
+    close(fildes[0]);
+    char **argv2 = (char **)(malloc((argc - pipeIdx + 1) * sizeof(char *)));
+    for (int i=0; i<argc - pipeIdx; i++){
+      argv2[i] = argv[i + pipeIdx + 1];
+    }
+      
+    argv2[argc - pipeIdx] = NULL;
+    //execvp(argv2[0], argv2);
+    //locatingProgram(argv2, argc - pipeIdx);
+    reDirect(argv2);
+    free_copied_args(argv2);
+  }
+ 
 }
 void nextRound(){
   //printf("\n");
@@ -292,7 +342,9 @@ void execute(char **argv, char *lineCmd, struct queue Q){
   if (childPid == 0) {
     
     
-    reDirect(argv);
+    if (!reDirect(argv)){
+      pipeExec(argv);
+    }
     exit(0);
     //exit(-1);
   } 
@@ -340,7 +392,7 @@ void prompt(){
     char *lineCmd = readLine();
     if (!lineCmd)
       break;
-    char **argv = parsingArgv(lineCmd);
+    char **argv = parsingArgv(lineCmd, " ");
     
     if (!changeDir(argv) &&
         !exitTerm(argv) && 
