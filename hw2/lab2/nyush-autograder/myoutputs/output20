@@ -2,20 +2,50 @@
     1 pts/0    00:00:00 bash
    85 pts/0    00:00:00 wc
   103 pts/0    00:00:00 sort
-  182 pts/0    00:00:00 sh
-  185 pts/0    00:00:00 gradeit.sh
-  496 pts/0    00:00:00 timeout
-  497 pts/0    00:00:00 bash
-  499 pts/0    00:00:00 nyush
-  500 pts/0    00:00:00 ps
+  804 pts/0    00:00:00 print_numbers_s
+  816 pts/0    00:00:00 print_numbers_s
+  830 pts/0    00:00:00 print_numbers_s
+  843 pts/0    00:00:00 print_numbers_s
+  857 pts/0    00:00:00 print_numbers_s
+  870 pts/0    00:00:00 print_numbers_s
+  884 pts/0    00:00:00 print_numbers_s
+  885 pts/0    00:00:00 print_numbers_s
+  899 pts/0    00:00:00 print_numbers_s
+  900 pts/0    00:00:00 print_numbers_s
+  914 pts/0    00:00:00 print_numbers_s
+  915 pts/0    00:00:00 print_numbers_s
+  928 pts/0    00:00:00 print_numbers_s
+  929 pts/0    00:00:00 print_numbers_s
+  930 pts/0    00:00:00 print_numbers_s
+ 1062 pts/0    00:00:00 sh
+ 1065 pts/0    00:00:00 gradeit.sh
+ 1376 pts/0    00:00:00 timeout
+ 1377 pts/0    00:00:00 bash
+ 1379 pts/0    00:00:00 nyush
+ 1380 pts/0    00:00:00 ps
 [nyush nyush-grading]$   PID TTY          TIME CMD
     1 pts/0    00:00:00 bash
    85 pts/0    00:00:00 wc
   103 pts/0    00:00:00 sort
-  182 pts/0    00:00:00 sh
-  185 pts/0    00:00:00 gradeit.sh
-  496 pts/0    00:00:00 timeout
-  497 pts/0    00:00:00 bash
-  499 pts/0    00:00:00 nyush
-  501 pts/0    00:00:00 ps
+  804 pts/0    00:00:00 print_numbers_s
+  816 pts/0    00:00:00 print_numbers_s
+  830 pts/0    00:00:00 print_numbers_s
+  843 pts/0    00:00:00 print_numbers_s
+  857 pts/0    00:00:00 print_numbers_s
+  870 pts/0    00:00:00 print_numbers_s
+  884 pts/0    00:00:00 print_numbers_s
+  885 pts/0    00:00:00 print_numbers_s
+  899 pts/0    00:00:00 print_numbers_s
+  900 pts/0    00:00:00 print_numbers_s
+  914 pts/0    00:00:00 print_numbers_s
+  915 pts/0    00:00:00 print_numbers_s
+  928 pts/0    00:00:00 print_numbers_s
+  929 pts/0    00:00:00 print_numbers_s
+  930 pts/0    00:00:00 print_numbers_s
+ 1062 pts/0    00:00:00 sh
+ 1065 pts/0    00:00:00 gradeit.sh
+ 1376 pts/0    00:00:00 timeout
+ 1377 pts/0    00:00:00 bash
+ 1379 pts/0    00:00:00 nyush
+ 1381 pts/0    00:00:00 ps
 [nyush nyush-grading]$ 

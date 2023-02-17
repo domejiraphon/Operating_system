@@ -304,7 +304,7 @@ void pipeExec(char **argv){
     close(1);
     dup2(fildes[1], 1);
     close(fildes[0]);
-  
+    close(fildes[1]);
     char **argv1 = (char **)(malloc((pipeIdx + 1) * sizeof(char *)));
     for (int i=0; i<pipeIdx; i++)
       argv1[i] = argv[i];
@@ -316,9 +316,10 @@ void pipeExec(char **argv){
     free_copied_args(argv1);
   }
   else {
-    close(fildes[1]);  
+    close(0);
     dup2(fildes[0], 0);
     close(fildes[0]);
+    close(fildes[1]);
     char **argv2 = (char **)(malloc((argc - pipeIdx + 1) * sizeof(char *)));
     for (int i=0; i<argc - pipeIdx; i++){
       argv2[i] = argv[i + pipeIdx + 1];
@@ -333,9 +334,8 @@ void pipeExec(char **argv){
  
 }
 void nextRound(){
-  //printf("\n");
-  //fflush(stdout);
 }
+
 void execute(char **argv, char *lineCmd, struct queue Q){
   pid_t childPid = fork();
   
