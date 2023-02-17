@@ -8,6 +8,7 @@ https://www.geeksforgeeks.org/strtok-strtok_r-functions-c-examples/
 https://www.gnu.org/software/libc/manual/html_node/Basic-Signal-Handling.html
 https://www.geeksforgeeks.org/c-program-list-files-sub-directories-directory/
 https://stackoverflow.com/questions/39002052/how-i-can-print-to-stderr-in-c
+https://stackoverflow.com/questions/19461744/how-to-make-parent-wait-for-all-child-processes-to-finish
 */
 #include <ctype.h>
 #include <stdio.h>
@@ -99,11 +100,7 @@ char **parsingArgv(char *lineCmd, const char *delim){
     strcpy(argv[j], token);
     argv[j][stringLength] = '\0';
   }
-  /*
-  for (int i=0; i<argc; i++){
-    printf("%d, %s\n", (int) strlen(argv[i]), argv[i]);
-  }
-  */
+  
   argv[argc] = NULL;
   return argv;
 }
@@ -174,6 +171,12 @@ void locatingProgram(char **argv, int moreIdx){
         fflush(stderr);
         exit(0);
       }
+      /*
+      int fd;
+      fd = open(file, O_RDONLY, S_IRUSR | S_IWUSR);
+      dup2(fd, 0);
+      close(fd);
+      */
       continue;
     }
     argv1[i-skip] = argv[i];
@@ -307,7 +310,7 @@ void pipeExec(char **argv){
       ;
     if (pipeIdx == argc)
       break;
-    if (pipeIdx == 0){
+    if (pipeIdx == 0 || pipeIdx == argc-1){
       fprintf(stderr, "Error: invalid command\n");
       fflush(stderr);
     }
@@ -370,12 +373,17 @@ bool checkFg(char **argv, struct Node *head, struct Node* tail){
     else {
       pid_t resumePid = removeNode(head, tail, *argv[1] - '1');
       if (resumePid != -1){
-        if (fork() == 0){
+        pid_t childPid = fork();
+        if (childPid == 0){
+
           kill(resumePid, SIGCONT);
+          //kill(resumePid, SIGKILL);
           exit(0);
         }
         else {
-          wait(NULL);
+          int *status=NULL;
+          waitpid(resumePid, status, 0);
+          //wait(NULL);
         }
       }
       else{
@@ -434,8 +442,8 @@ void execute(char **argv, char *lineCmd, struct Node *head){
       //fflush(stdout);
       //exit(0);
       addNode(head, lineCmd, childPid);
-     
     }
+    
   }
 }
 
@@ -464,11 +472,11 @@ void prompt(){
       execute(argv, lineCmd, head);
     }
     
-    //free(lineCmd);
+    
     free_copied_args(argv, NULL);
     
   }
-  //clearList(head);
+  clearList(head);
 }
 
 int main() {
