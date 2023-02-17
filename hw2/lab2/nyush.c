@@ -358,33 +358,35 @@ void pipeExec(char **argv){
 void nextRound(){
 }
 
-void execute(char **argv, char *lineCmd, struct Node *head){
-  pid_t childPid = fork();
-  
-  if (childPid == 0) {
+bool checkFg(char **argv, struct Node *head, struct Node* tail){
+  const char* cmd = argv[0];
+  if (!strcmp(cmd, "fg")){
     
-    
-    if (!reDirect(argv)){
-      pipeExec(argv);
+    int argc = getLengthDoublePtr(argv);
+    if (argc != 2){
+      fprintf(stderr, "Error: invalid command\n");
+      fflush(stderr);
     }
-    exit(0);
-    //exit(-1);
-  } 
-  else {
-    // parent
-    
-    int status=0;
-    signal(SIGINT, nextRound);
-    signal(SIGTSTP, nextRound);
-    signal(SIGQUIT, nextRound);
- 
-    waitpid(childPid, &status, WUNTRACED);
-    
-    if (WIFSTOPPED(status) == 1){
-      addNode(head, lineCmd, childPid);
-     
+    else {
+      pid_t resumePid = removeNode(head, tail, *argv[1] - '1');
+      if (resumePid != -1){
+        if (fork() == 0){
+          kill(resumePid, SIGCONT);
+          exit(0);
+        }
+        else {
+          wait(NULL);
+        }
+      }
+      else{
+        fprintf(stderr, "Error: invalid job\n");
+        fflush(stderr);
+      }
     }
+    return true;
   }
+  
+  return false;
 }
 
 bool checkJob(char **argv, struct Node *head, struct Node *tail){
@@ -403,27 +405,38 @@ bool checkJob(char **argv, struct Node *head, struct Node *tail){
   return false;
 }
 
-bool checkFg(char **argv, struct Node* tail){
-  const char* cmd = argv[0];
-  if (!strcmp(cmd, "fg")){
-    int argc = getLengthDoublePtr(argv);
-    if (argc != 2){
-      fprintf(stderr, "Error: invalid command\n");
-      fflush(stderr);
+void execute(char **argv, char *lineCmd, struct Node *head){
+  pid_t childPid = fork();
+  
+  if (childPid == 0) {
+    
+    
+    if (
+      !reDirect(argv) ){
+      pipeExec(argv);
     }
-    else {
-      //int id = *argv[1] - '0';
-      pid_t resumePid = removeNode(tail, *argv[1] - '0');
-      if (resumePid != -1)
-        kill(resumePid, SIGCONT);
-      else{
-        fprintf(stderr, "Error: invalid job\n");
-        fflush(stderr);
-      }
+    exit(0);
+    //exit(-1);
+    
+  } 
+  else {
+    // parent
+    
+    int status=0;
+    signal(SIGINT, nextRound);
+    signal(SIGTSTP, nextRound);
+    signal(SIGQUIT, nextRound);
+ 
+    waitpid(childPid, &status, WUNTRACED);
+    
+    if (WIFSTOPPED(status) == 1){
+      //printf("STOP %s", lineCmd);
+      //fflush(stdout);
+      //exit(0);
+      addNode(head, lineCmd, childPid);
+     
     }
-    return true;
   }
-  return false;
 }
 
 void prompt(){
@@ -444,18 +457,18 @@ void prompt(){
     char **argv = parsingArgv(lineCmd, " ");
     
     if (!changeDir(argv) &&
-        !exitTerm(argv, head, tail) && 
-        !checkJob(argv, head, tail) &&
-        !checkFg(argv, tail)){
+        !exitTerm(argv, head, tail) &&
+        !checkFg(argv, head, tail) &&
+        !checkJob(argv, head, tail)){
       
       execute(argv, lineCmd, head);
     }
     
     //free(lineCmd);
-    //free_copied_args(argv, NULL);
+    free_copied_args(argv, NULL);
     
   }
-  clearList(head);
+  //clearList(head);
 }
 
 int main() {

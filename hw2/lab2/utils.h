@@ -12,7 +12,7 @@ void free_copied_args(char **args, ...);
 int getLengthDoublePtr(char **ptr); 
 
 void addNode(struct Node *head, char *cmd, pid_t pid);
-pid_t removeNode(struct Node* tail, int idx);
+pid_t removeNode(struct Node *head, struct Node* tail, int idx);
 void printJobs(struct Node *head, struct Node *tail);
 void clearList(struct Node *head);
 bool empty(struct Node *head, struct Node *tail);

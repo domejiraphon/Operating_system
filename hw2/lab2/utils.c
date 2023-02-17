@@ -45,21 +45,24 @@ void addNode(struct Node *head, char *cmd, pid_t pid){
   next -> prev = cur;
 }
 
-pid_t removeNode(struct Node* tail, int idx){
-  if (idx < 1)
+pid_t removeNode(struct Node *head, struct Node* tail, int idx){
+  if (idx < 0)
     return -1;
-  struct Node *cur = tail;
-  while (idx > 0 && cur){
+  struct Node *cur = tail -> prev;
+  
+  while (idx > 0 && cur != head){
     cur = cur -> prev;
     idx--;
   }
-  if (idx != 0)
+  if (cur == head)
     return -1;
+ 
   struct Node* prev = cur -> prev;
   struct Node* next = cur -> next;
   prev -> next = next;
   next -> prev = prev;
   pid_t out = cur -> pid;
+  
   free(cur);
   return out;
 }
