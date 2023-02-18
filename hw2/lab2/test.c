@@ -1,9 +1,7 @@
-#include <unistd.h>
 #include <stdio.h>
-
+#include <unistd.h>
 int main() {
-  char *args[] = { "wc", "-l", "input.txt", NULL };
-  execvp(args[0], args);
-  perror("execv");
-  return 1;
+ printf("one");
+ execl("/bin/echo", "/bin/echo", "one", "two", "three", NULL);
+ printf("three");
 }

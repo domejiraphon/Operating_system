@@ -7,6 +7,7 @@ https://www.geeksforgeeks.org/signals-c-language/
 https://www.geeksforgeeks.org/strtok-strtok_r-functions-c-examples/
 https://www.gnu.org/software/libc/manual/html_node/Basic-Signal-Handling.html
 https://www.geeksforgeeks.org/c-program-list-files-sub-directories-directory/
+https://www.geeksforgeeks.org/how-to-append-a-character-to-a-string-in-c/
 https://stackoverflow.com/questions/39002052/how-i-can-print-to-stderr-in-c
 https://stackoverflow.com/questions/19461744/how-to-make-parent-wait-for-all-child-processes-to-finish
 */
@@ -107,7 +108,7 @@ char **parsingArgv(char *lineCmd, const char *delim){
 
 bool changeDir(char **argv){
   const char* cmd = argv[0];
-  if (strcmp(cmd, "cd") == 0){
+  if (!strcmp(cmd, "cd")){
     int length = getLengthDoublePtr(argv);
     if (length == 1 || length > 2){
       fprintf(stderr, "Error: invalid command\n");
@@ -133,7 +134,7 @@ bool changeDir(char **argv){
 
 bool exitTerm(char **argv, struct Node *head, struct Node *tail){
   const char* cmd = argv[0];
-  if (strcmp(cmd, "exit") == 0){
+  if (!strcmp(cmd, "exit")){
     int length = getLengthDoublePtr(argv);
    
     if (length != 1){
@@ -158,7 +159,7 @@ void locatingProgram(char **argv, int moreIdx){
   int skip=0;
   
   for (; i<moreIdx; i++){
-    if (strcmp(argv[i], "<") == 0){
+    if (!strcmp(argv[i], "<")){
       skip++;
       const char *file = argv[i + 1];
       if (!file){
@@ -171,18 +172,23 @@ void locatingProgram(char **argv, int moreIdx){
         fflush(stderr);
         exit(0);
       }
-      /*
+      
       int fd;
       fd = open(file, O_RDONLY, S_IRUSR | S_IWUSR);
       dup2(fd, 0);
       close(fd);
-      */
-      continue;
+      
+      break;
     }
     argv1[i-skip] = argv[i];
   }
-  
-  argv1[moreIdx - skip] = NULL;
+  //argv[moreIdx - skip] = NULL;
+  argv1[i] = NULL;
+  /*
+  for (int i=0; i<getLengthDoublePtr(argv1); i++)
+    printf("%s\n", argv1[i]);
+  exit(0);
+  */
   bool slashExist=false;
   int length = strlen(argv1[0]);
   for (int i=0; i<length && !slashExist; i++){
@@ -272,8 +278,8 @@ bool reDirect(char **argv){
   
   bool outDirect = false;
   for (; moreIdx < argc; moreIdx++){
-    if (strcmp(argv[moreIdx], ">") == 0 ||
-        strcmp(argv[moreIdx], ">>") == 0){
+    if (!strcmp(argv[moreIdx], ">") ||
+        !strcmp(argv[moreIdx], ">>")){
       outDirect = true;
       break;
     }
@@ -286,11 +292,11 @@ bool reDirect(char **argv){
       exit(0);
     }
     int fd;
-    if (strcmp(argv[moreIdx], ">") == 0){
+    if (!strcmp(argv[moreIdx], ">")){
       fd = open(file, 
           O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
     }
-    else if (strcmp(argv[moreIdx], ">>") == 0) {
+    else if (!strcmp(argv[moreIdx], ">>")) {
       fd = open(file, 
           O_WRONLY | O_APPEND | O_CREAT, S_IRUSR | S_IWUSR);
     }
@@ -313,6 +319,7 @@ void pipeExec(char **argv){
     if (pipeIdx == 0 || pipeIdx == argc-1){
       fprintf(stderr, "Error: invalid command\n");
       fflush(stderr);
+      return;
     }
     int fildes[2];
     char **argv1, **argv2;
@@ -361,30 +368,21 @@ void pipeExec(char **argv){
 void nextRound(){
 }
 
-bool checkFg(char **argv, struct Node *head, struct Node* tail){
+bool checkFg(int argc, char **argv, struct Node *head, struct Node* tail){
   const char* cmd = argv[0];
   if (!strcmp(cmd, "fg")){
-    
-    int argc = getLengthDoublePtr(argv);
     if (argc != 2){
       fprintf(stderr, "Error: invalid command\n");
       fflush(stderr);
     }
     else {
-      pid_t resumePid = removeNode(head, tail, *argv[1] - '1');
-      if (resumePid != -1){
-        pid_t childPid = fork();
-        if (childPid == 0){
-
-          kill(resumePid, SIGCONT);
-          //kill(resumePid, SIGKILL);
-          exit(0);
-        }
-        else {
-          int *status=NULL;
-          waitpid(resumePid, status, 0);
-          //wait(NULL);
-        }
+      struct Node *resumeProcess = removeNode(head, tail, *argv[1] - '1');
+      if (resumeProcess){
+        int status=0;
+        kill(resumeProcess -> pid, SIGCONT);
+        waitpid(resumeProcess -> pid, &status, WUNTRACED);
+        if (WIFSTOPPED(status) == 1)
+          addNode(head, resumeProcess -> cmd, resumeProcess -> pid);
       }
       else{
         fprintf(stderr, "Error: invalid job\n");
@@ -397,11 +395,10 @@ bool checkFg(char **argv, struct Node *head, struct Node* tail){
   return false;
 }
 
-bool checkJob(char **argv, struct Node *head, struct Node *tail){
+bool checkJob(int argc, char **argv, struct Node *head, struct Node *tail){
   const char* cmd = argv[0];
 
   if (!strcmp(cmd, "jobs")){
-    int argc = getLengthDoublePtr(argv);
     if (argc != 1){
       fprintf(stderr, "Error: invalid command\n");
       fflush(stderr);
@@ -463,11 +460,11 @@ void prompt(){
     if (!lineCmd)
       break;
     char **argv = parsingArgv(lineCmd, " ");
-    
+    int argc = getLengthDoublePtr(argv);
     if (!changeDir(argv) &&
         !exitTerm(argv, head, tail) &&
-        !checkFg(argv, head, tail) &&
-        !checkJob(argv, head, tail)){
+        !checkFg(argc, argv, head, tail) &&
+        !checkJob(argc, argv, head, tail)){
       
       execute(argv, lineCmd, head);
     }

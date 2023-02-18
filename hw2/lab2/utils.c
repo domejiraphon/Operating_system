@@ -45,9 +45,9 @@ void addNode(struct Node *head, char *cmd, pid_t pid){
   next -> prev = cur;
 }
 
-pid_t removeNode(struct Node *head, struct Node* tail, int idx){
+struct Node *removeNode(struct Node *head, struct Node* tail, int idx){
   if (idx < 0)
-    return -1;
+    return NULL;
   struct Node *cur = tail -> prev;
   
   while (idx > 0 && cur != head){
@@ -55,16 +55,13 @@ pid_t removeNode(struct Node *head, struct Node* tail, int idx){
     idx--;
   }
   if (cur == head)
-    return -1;
+    return NULL;
  
   struct Node* prev = cur -> prev;
   struct Node* next = cur -> next;
   prev -> next = next;
   next -> prev = prev;
-  pid_t out = cur -> pid;
-  
-  free(cur);
-  return out;
+  return cur;
 }
 
 void printJobs(struct Node *head, struct Node *tail){
