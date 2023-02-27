@@ -1,41 +1,17 @@
 [nyush nyush-grading]$   PID TTY          TIME CMD
     1 pts/0    00:00:00 bash
-  716 pts/0    00:00:00 print_numbers_s
-  729 pts/0    00:00:00 print_numbers_s
-  742 pts/0    00:00:00 print_numbers_s
-  786 pts/0    00:00:00 print_numbers_s
-  801 pts/0    00:00:00 print_numbers_s
- 1653 pts/0    00:00:00 print_numbers_s
- 1666 pts/0    00:00:00 print_numbers_s
- 1679 pts/0    00:00:00 print_numbers_s
- 1727 pts/0    00:00:00 print_numbers_s
- 1742 pts/0    00:00:00 print_numbers_s
- 4447 pts/0    00:00:00 print_numbers_s
- 4471 pts/0    00:00:00 print_numbers_s
- 4483 pts/0    00:00:00 sh
- 4486 pts/0    00:00:00 gradeit.sh
- 4797 pts/0    00:00:00 timeout
- 4798 pts/0    00:00:00 bash
- 4800 pts/0    00:00:00 nyush
- 4801 pts/0    00:00:00 ps
+ 4645 pts/0    00:00:00 sh
+ 4648 pts/0    00:00:00 gradeit.sh
+ 4959 pts/0    00:00:00 timeout
+ 4960 pts/0    00:00:00 bash
+ 4962 pts/0    00:00:00 nyush
+ 4963 pts/0    00:00:00 ps
 [nyush nyush-grading]$   PID TTY          TIME CMD
     1 pts/0    00:00:00 bash
-  716 pts/0    00:00:00 print_numbers_s
-  729 pts/0    00:00:00 print_numbers_s
-  742 pts/0    00:00:00 print_numbers_s
-  786 pts/0    00:00:00 print_numbers_s
-  801 pts/0    00:00:00 print_numbers_s
- 1653 pts/0    00:00:00 print_numbers_s
- 1666 pts/0    00:00:00 print_numbers_s
- 1679 pts/0    00:00:00 print_numbers_s
- 1727 pts/0    00:00:00 print_numbers_s
- 1742 pts/0    00:00:00 print_numbers_s
- 4447 pts/0    00:00:00 print_numbers_s
- 4471 pts/0    00:00:00 print_numbers_s
- 4483 pts/0    00:00:00 sh
- 4486 pts/0    00:00:00 gradeit.sh
- 4797 pts/0    00:00:00 timeout
- 4798 pts/0    00:00:00 bash
- 4800 pts/0    00:00:00 nyush
- 4802 pts/0    00:00:00 ps
+ 4645 pts/0    00:00:00 sh
+ 4648 pts/0    00:00:00 gradeit.sh
+ 4959 pts/0    00:00:00 timeout
+ 4960 pts/0    00:00:00 bash
+ 4962 pts/0    00:00:00 nyush
+ 4964 pts/0    00:00:00 ps
 [nyush nyush-grading]$ 

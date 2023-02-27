@@ -2,6 +2,7 @@
 I read STDOUT from this manual. https://en.cppreference.com/w/cpp/io/c/std_streams
 I read how to concatenate string https://cplusplus.com/reference/cstring/strcat/
 https://www.programiz.com/c-programming/library-function/string.h/strcmp
+https://www.ibm.com/docs/en/zos/2.3.0?topic=functions-getcwd-get-path-name-working-directory
 https://stackoverflow.com/questions/12510874/how-can-i-check-if-a-directory-exists
 https://www.geeksforgeeks.org/signals-c-language/
 https://www.geeksforgeeks.org/strtok-strtok_r-functions-c-examples/
@@ -10,6 +11,8 @@ https://www.geeksforgeeks.org/c-program-list-files-sub-directories-directory/
 https://www.geeksforgeeks.org/how-to-append-a-character-to-a-string-in-c/
 https://stackoverflow.com/questions/39002052/how-i-can-print-to-stderr-in-c
 https://stackoverflow.com/questions/19461744/how-to-make-parent-wait-for-all-child-processes-to-finish
+https://www.tutorialspoint.com/cprogramming/c_structures.htm
+https://www.programiz.com/c-programming/c-structure-function
 */
 #include <ctype.h>
 #include <stdio.h>
@@ -64,22 +67,19 @@ void header(){
 }
 
 int numArg(const char *lineCmd){
-
   int argc=0;
   const char *delim = " ";
-  
   char *str= (char *)malloc((strlen(lineCmd) + 1) * sizeof(char));
   strcpy(str, lineCmd);
   char **saveptr=&str;
-  
+
   while (strtok_r(str, delim, saveptr))
     argc++;
   
   return argc;
 }
 
-char **parsingArgv(char *lineCmd, const char *delim){
-  int argc = numArg(lineCmd);
+char **parsingArgv(int argc, char *lineCmd, const char *delim){
   
   char *str= (char *)malloc((strlen(lineCmd) + 1) * sizeof(char));
   strcpy(str, lineCmd);
@@ -106,20 +106,16 @@ char **parsingArgv(char *lineCmd, const char *delim){
   return argv;
 }
 
-bool changeDir(char **argv){
+bool changeDir(int argc, char **argv){
   const char* cmd = argv[0];
   if (!strcmp(cmd, "cd")){
-    int length = getLengthDoublePtr(argv);
-    if (length == 1 || length > 2){
+    if (argc == 1 || argc > 2){
       fprintf(stderr, "Error: invalid command\n");
       fflush(stderr);
     }
     else{
-      //const char *path = "/2250";//
       const char *path = argv[1];
       DIR *dir = opendir(path);
-      //printf("%s\n", path);
-      //printf("%d", (int)strlen(path)); exit(0);
       if (dir)
         chdir(path);
       else{
@@ -132,12 +128,10 @@ bool changeDir(char **argv){
   return false;
 }
 
-bool exitTerm(char **argv, struct Node *head, struct Node *tail){
+bool exitTerm(int argc, char **argv, struct Node *head, struct Node *tail){
   const char* cmd = argv[0];
   if (!strcmp(cmd, "exit")){
-    int length = getLengthDoublePtr(argv);
-   
-    if (length != 1){
+    if (argc != 1){
       fprintf(stderr, "Error: invalid command\n");
       fflush(stderr);
       return true;
@@ -177,18 +171,12 @@ void locatingProgram(char **argv, int moreIdx){
       fd = open(file, O_RDONLY, S_IRUSR | S_IWUSR);
       dup2(fd, 0);
       close(fd);
-      
       break;
     }
     argv1[i-skip] = argv[i];
   }
-  //argv[moreIdx - skip] = NULL;
   argv1[i] = NULL;
-  /*
-  for (int i=0; i<getLengthDoublePtr(argv1); i++)
-    printf("%s\n", argv1[i]);
-  exit(0);
-  */
+ 
   bool slashExist=false;
   int length = strlen(argv1[0]);
   for (int i=0; i<length && !slashExist; i++){
@@ -230,7 +218,6 @@ void locatingProgram(char **argv, int moreIdx){
     for (int i=0; i<length; i++)
       if (i < last)
         strncat(pathToLib, &tmp[i], 1);
-        //strcat(pathToLib, tmp[i]);
     char *saveptr=tmp;
     char *token = tmp;
     
@@ -250,15 +237,20 @@ void locatingProgram(char **argv, int moreIdx){
   
   DIR *lib = opendir(pathToLib);
   struct dirent *libFile = NULL;
-  strcat(pathToLib, "/");
-  strcat(pathToLib, program);
-  argv1[0] = pathToLib;
   
+  
+  if (slashExist){
+    strcat(pathToLib, "/");
+    strcat(pathToLib, program);
+    argv1[0] = pathToLib;
+  }
   
   while ((libFile = readdir(lib))){
-    //printf("%s\n", libFile ->d_name);
     if (!strcmp(libFile->d_name, program)){
-      execv(argv1[0], argv1);
+      if (slashExist)
+        execv(argv1[0], argv1);
+      else
+        execvp(argv1[0], argv1);
       free(argv1);
       free(pathToLib);
       free(tmp);
@@ -326,8 +318,6 @@ void pipeExec(char **argv){
     pipe(fildes);
     if (!fork()){
       //first
-      
-      close(1);
       dup2(fildes[1], 1);
       close(fildes[0]);
       close(fildes[1]);
@@ -335,22 +325,18 @@ void pipeExec(char **argv){
       argv1 = (char **)(malloc((pipeIdx + 1) * sizeof(char *)));
       for (int i=0; i<pipeIdx; i++)
         argv1[i] = argv[i];
-      
       argv1[pipeIdx] = NULL;
    
       reDirect(argv1);
     }
     else {
       //second
-      close(0);
       dup2(fildes[0], 0);
       close(fildes[0]);
       close(fildes[1]);
       argv2 = (char **)(malloc((argc - pipeIdx + 1) * sizeof(char *)));
-      for (int i=0; i<argc - pipeIdx; i++){
+      for (int i=0; i<argc - pipeIdx; i++)
         argv2[i] = argv[i + pipeIdx + 1];
-      }
-        
       argv2[argc - pipeIdx] = NULL;
      
       reDirect(argv2);
@@ -359,10 +345,6 @@ void pipeExec(char **argv){
     pipeIdx++;
     break;
   }
-  
-  
-  
- 
 }
 
 void nextRound(){
@@ -381,7 +363,7 @@ bool checkFg(int argc, char **argv, struct Node *head, struct Node* tail){
         int status=0;
         kill(resumeProcess -> pid, SIGCONT);
         waitpid(resumeProcess -> pid, &status, WUNTRACED);
-        if (WIFSTOPPED(status) == 1)
+        if (WIFSTOPPED(status))
           addNode(head, resumeProcess -> cmd, resumeProcess -> pid);
       }
       else{
@@ -397,7 +379,6 @@ bool checkFg(int argc, char **argv, struct Node *head, struct Node* tail){
 
 bool checkJob(int argc, char **argv, struct Node *head, struct Node *tail){
   const char* cmd = argv[0];
-
   if (!strcmp(cmd, "jobs")){
     if (argc != 1){
       fprintf(stderr, "Error: invalid command\n");
@@ -412,17 +393,11 @@ bool checkJob(int argc, char **argv, struct Node *head, struct Node *tail){
 
 void execute(char **argv, char *lineCmd, struct Node *head){
   pid_t childPid = fork();
-  
   if (childPid == 0) {
-    
-    
-    if (
-      !reDirect(argv) ){
+    if (!reDirect(argv))
       pipeExec(argv);
-    }
-    exit(0);
-    //exit(-1);
     
+    exit(0);
   } 
   else {
     // parent
@@ -431,16 +406,11 @@ void execute(char **argv, char *lineCmd, struct Node *head){
     signal(SIGINT, nextRound);
     signal(SIGTSTP, nextRound);
     signal(SIGQUIT, nextRound);
- 
     waitpid(childPid, &status, WUNTRACED);
     
-    if (WIFSTOPPED(status) == 1){
-      //printf("STOP %s", lineCmd);
-      //fflush(stdout);
-      //exit(0);
+    if (WIFSTOPPED(status))
       addNode(head, lineCmd, childPid);
-    }
-    
+
   }
 }
 
@@ -459,26 +429,22 @@ void prompt(){
     char *lineCmd = readLine();
     if (!lineCmd)
       break;
-    char **argv = parsingArgv(lineCmd, " ");
-    int argc = getLengthDoublePtr(argv);
-    if (!changeDir(argv) &&
-        !exitTerm(argv, head, tail) &&
+    int argc = numArg(lineCmd);
+    char **argv = parsingArgv(argc, lineCmd, " ");
+    
+    if (!changeDir(argc, argv) &&
+        !exitTerm(argc, argv, head, tail) &&
         !checkFg(argc, argv, head, tail) &&
         !checkJob(argc, argv, head, tail)){
       
       execute(argv, lineCmd, head);
     }
-    
-    
     free_copied_args(argv, NULL);
-    
   }
   clearList(head);
 }
 
 int main() {
-  
   prompt();
-  
   return 0;
 }

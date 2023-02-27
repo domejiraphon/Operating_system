@@ -6,7 +6,7 @@
 #include <string.h>
 #include <stdarg.h>
 #include "utils.h"
-
+#include <dirent.h>
 void helper(char **args);
 void free_copied_args(char **fmt, ...){
   va_list args;
