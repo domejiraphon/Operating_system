@@ -7,6 +7,8 @@
 #include <stdarg.h>
 #include "utils.h"
 #include <dirent.h>
+#define SIZE_MAX 1000
+
 void helper(char **args);
 void free_copied_args(char **fmt, ...){
   va_list args;
@@ -92,3 +94,14 @@ bool empty(struct Node *head, struct Node *tail){
   return i == 0;
 }
 
+
+char *readLine(){
+  char *lineCmd = (char *)malloc((SIZE_MAX) * sizeof(char));
+  size_t size = SIZE_MAX;
+  if ((getline(&lineCmd, &size, stdin) == -1))
+    return NULL;
+  
+  return lineCmd;
+}
+
+void nextRound(){}

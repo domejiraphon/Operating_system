@@ -16,6 +16,6 @@ struct Node *removeNode(struct Node *head, struct Node* tail, int idx);
 void printJobs(struct Node *head, struct Node *tail);
 void clearList(struct Node *head);
 bool empty(struct Node *head, struct Node *tail);
-
-
+char *readLine();
+void nextRound();
 #endif

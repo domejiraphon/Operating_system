@@ -33,15 +33,6 @@ https://www.programiz.com/c-programming/c-structure-function
 #define SIZE_MAX 1000
 #define BASEDIR "[nyush "
 
-char *readLine(){
-  char *lineCmd = (char *)malloc((SIZE_MAX) * sizeof(char));
-  size_t size = SIZE_MAX;
-  if ((getline(&lineCmd, &size, stdin) == -1))
-    return NULL;
-  
-  return lineCmd;
-}
-
 void header(){
   char *buf = (char *)malloc((SIZE_MAX) * sizeof(char));
   getcwd(buf, SIZE_MAX);
@@ -345,9 +336,6 @@ void pipeExec(char **argv){
     pipeIdx++;
     break;
   }
-}
-
-void nextRound(){
 }
 
 bool checkFg(int argc, char **argv, struct Node *head, struct Node* tail){
