@@ -160,6 +160,7 @@ void locatingProgram(char **argv, int moreIdx){
       
       int fd;
       fd = open(file, O_RDONLY, S_IRUSR | S_IWUSR);
+      close(0);
       dup2(fd, 0);
       close(fd);
       break;
@@ -283,6 +284,7 @@ bool reDirect(char **argv){
       fd = open(file, 
           O_WRONLY | O_APPEND | O_CREAT, S_IRUSR | S_IWUSR);
     }
+    close(1);
     dup2(fd, 1);
     close(fd);
   }
@@ -309,6 +311,7 @@ void pipeExec(char **argv){
     pipe(fildes);
     if (!fork()){
       //first
+      close(1);
       dup2(fildes[1], 1);
       close(fildes[0]);
       close(fildes[1]);
@@ -322,6 +325,7 @@ void pipeExec(char **argv){
     }
     else {
       //second
+      close(0);
       dup2(fildes[0], 0);
       close(fildes[0]);
       close(fildes[1]);
