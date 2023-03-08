@@ -1,62 +1,82 @@
-#include <pthread.h>
+/*
+This is the code I looked up from ChatGPT. I ran it to get the understadings. 
+I was confused about how to support the command such as
+out1 > out2 > out3 > out4 > ...
+This commmand is not an invalid cmd in our hw based on the grammar. 
+*/
 #include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/wait.h>
+#include <string.h>
+#include <fcntl.h>
 
-#define NUM_THREADS 2
+#define MAX_ARGS 100
+#define MAX_LENGTH 100
 
-int counter = 0;
-pthread_spinlock_t lock;
-
-void *thread_func(void *threadid) {
-  long tid;
-  tid = (long)threadid;
-  printf("Thread %ld starting...\n", tid);
-  
-  // acquire the spinlock
-  pthread_spin_lock(&lock);
-  
-  // simulate a long-running task
-  sleep(5);
-  
-  // increment the counter
-  counter++;
-  
-  // release the spinlock
-  pthread_spin_unlock(&lock);
-  
-  printf("Thread %ld exiting...\n", tid);
-  pthread_exit(NULL);
-}
-
-int main(int argc, char *argv[]) {
-  pthread_t threads[NUM_THREADS];
-  int rc;
-  long t;
-  
-  // initialize the spinlock
-  pthread_spin_init(&lock, 0);
-
-  // create the threads
-  for (t = 0; t < NUM_THREADS; t++) {
-    rc = pthread_create(&threads[t], NULL, thread_func, (void *)t);
-    if (rc) {
-      printf("ERROR; return code from pthread_create() is %d\n", rc);
-      return -1;
+int main(void) {
+    while (1) {
+        printf("$ ");
+        char line[MAX_LENGTH];
+        if (!fgets(line, MAX_LENGTH, stdin)) {
+            break;
+        }
+        int length = strlen(line);
+        if (line[length - 1] == '\n') {
+            line[length - 1] = '\0';
+        }
+        char *args[MAX_ARGS];
+        int argc = 0;
+        char *token = strtok(line, " ");
+        int input_redirect = 0;
+        int output_redirect = 0;
+        char input_file[MAX_LENGTH];
+        char output_file[MAX_LENGTH];
+        while (token != NULL) {
+            if (strcmp(token, "<") == 0) {
+                input_redirect = 1;
+                token = strtok(NULL, " ");
+                strcpy(input_file, token);
+            } else if (strcmp(token, ">") == 0) {
+                output_redirect = 1;
+                token = strtok(NULL, " ");
+                strcpy(output_file, token);
+                
+            } else {
+                args[argc++] = token;
+            }
+            token = strtok(NULL, " ");
+            
+        }
+        args[argc] = NULL;
+       
+        if (argc == 0) {
+            continue;
+        }
+        if (strcmp(args[0], "exit") == 0) {
+            break;
+        }
+        pid_t pid = fork();
+        if (pid == 0) {
+            if (input_redirect) {
+                int fd = open(input_file, O_RDONLY);
+                dup2(fd, 0);
+                close(fd);
+            }
+            if (output_redirect) {
+                int fd = open(output_file, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+                dup2(fd, 1);
+                close(fd);
+            }
+            execvp(args[0], args);
+            fprintf(stderr, "Error: command not found\n");
+            exit(1);
+        } else if (pid > 0) {
+            int status;
+            wait(&status);
+        } else {
+            fprintf(stderr, "Error: failed to create new process\n");
+        }
     }
-  }
-
-  // join the threads
-  for (t = 0; t < NUM_THREADS; t++) {
-    rc = pthread_join(threads[t], NULL);
-    if (rc) {
-      printf("ERROR; return code from pthread_join() is %d\n", rc);
-      return -1;
-    }
-  }
-
-  // destroy the spinlock
-  pthread_spin_destroy(&lock);
-
-  printf("Final counter value: %d\n", counter);
-
-  return 0;
+    return 0;
 }

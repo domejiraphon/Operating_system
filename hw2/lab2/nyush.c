@@ -1,6 +1,6 @@
 /*
-I read STDOUT from this manual. https://en.cppreference.com/w/cpp/io/c/std_streams
-I read how to concatenate string https://cplusplus.com/reference/cstring/strcat/
+https://en.cppreference.com/w/cpp/io/c/std_streams
+https://cplusplus.com/reference/cstring/strcat/
 https://www.programiz.com/c-programming/library-function/string.h/strcmp
 https://www.ibm.com/docs/en/zos/2.3.0?topic=functions-getcwd-get-path-name-working-directory
 https://stackoverflow.com/questions/12510874/how-can-i-check-if-a-directory-exists
@@ -20,11 +20,9 @@ https://www.programiz.com/c-programming/c-structure-function
 #include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
-
 #include <stdarg.h>
-
 #include <dirent.h>
-#include<signal.h>
+#include <signal.h>
 #include <fcntl.h>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -34,6 +32,9 @@ https://www.programiz.com/c-programming/c-structure-function
 #define BASEDIR "[nyush "
 
 void header(){
+  /*
+  Printing out the shell username and current directory
+  */
   char *buf = (char *)malloc((SIZE_MAX) * sizeof(char));
   getcwd(buf, SIZE_MAX);
   
@@ -58,6 +59,9 @@ void header(){
 }
 
 int numArg(const char *lineCmd){
+  /*
+  Get number of inputs which is similar to argc
+  */
   int argc=0;
   const char *delim = " ";
   char *str= (char *)malloc((strlen(lineCmd) + 1) * sizeof(char));
@@ -71,7 +75,9 @@ int numArg(const char *lineCmd){
 }
 
 char **parsingArgv(int argc, char *lineCmd, const char *delim){
-  
+  /*
+  Parsing the text output to double pointer
+  */
   char *str= (char *)malloc((strlen(lineCmd) + 1) * sizeof(char));
   strcpy(str, lineCmd);
   
@@ -79,7 +85,6 @@ char **parsingArgv(int argc, char *lineCmd, const char *delim){
   
   char *saveptr=str;
   char *token = lineCmd;
-  
   for (int j=0; ; j++, str = NULL) {
     token = strtok_r(str, delim, &saveptr);
     if (!token)
@@ -98,6 +103,12 @@ char **parsingArgv(int argc, char *lineCmd, const char *delim){
 }
 
 bool changeDir(int argc, char **argv){
+  /*
+  This functionality supports command cd.
+  It checks whether the command is invalid or not.
+  If it isn't, it prints out the error.
+  If it is, change to that directory.
+  */
   const char* cmd = argv[0];
   if (!strcmp(cmd, "cd")){
     if (argc == 1 || argc > 2){
@@ -120,6 +131,12 @@ bool changeDir(int argc, char **argv){
 }
 
 bool exitTerm(int argc, char **argv, struct Node *head, struct Node *tail){
+  /*
+  This functionality supports command exit.
+    It checks whether the command is invalid or not.
+    If it isn't, it prints out the error.
+    If it is, terminate the shell.
+  */
   const char* cmd = argv[0];
   if (!strcmp(cmd, "exit")){
     if (argc != 1){
@@ -139,6 +156,12 @@ bool exitTerm(int argc, char **argv, struct Node *head, struct Node *tail){
 }
 
 void locatingProgram(char **argv, int moreIdx){
+  /*
+  This functionality supports run command.
+    It checks whether the command is invalid or not.
+    If it isn't, it prints out the error.
+    If it is, run the cmd.
+  */
   char **argv1=(char **)malloc((moreIdx+1) * sizeof(char *));
   int i=0;
   int skip=0;
@@ -254,6 +277,12 @@ void locatingProgram(char **argv, int moreIdx){
 }
 
 bool reDirect(char **argv){
+  /*
+  This functionality supports input/output redirection.
+    It checks whether the command is invalid or not.
+    If it isn't, it prints out the error.
+    If it is, run the command.
+  */
   int moreIdx=0;
   int argc = getLengthDoublePtr(argv);
   for (int i=0; i<argc; i++)
@@ -293,6 +322,12 @@ bool reDirect(char **argv){
 }
 
 void pipeExec(char **argv){
+  /*
+  This functionality supports pipe command.
+    It checks whether the command is invalid or not.
+    If it isn't, it prints out the error.
+    If it is, run cmd.
+  */
   int argc = getLengthDoublePtr(argv);
   int pipeIdx=0;
   
@@ -320,7 +355,8 @@ void pipeExec(char **argv){
       for (int i=0; i<pipeIdx; i++)
         argv1[i] = argv[i];
       argv1[pipeIdx] = NULL;
-   
+
+      //run cmd
       reDirect(argv1);
     }
     else {
@@ -333,7 +369,8 @@ void pipeExec(char **argv){
       for (int i=0; i<argc - pipeIdx; i++)
         argv2[i] = argv[i + pipeIdx + 1];
       argv2[argc - pipeIdx] = NULL;
-     
+
+      //run cmd
       reDirect(argv2);
     }
     free_copied_args(argv1, argv2, NULL);
@@ -343,6 +380,12 @@ void pipeExec(char **argv){
 }
 
 bool checkFg(int argc, char **argv, struct Node *head, struct Node* tail){
+  /*
+  This functionality supports fg command.
+    It checks whether the command is invalid or not.
+    If it isn't, it prints out the error.
+    If it is, continue the stopped process.
+  */
   const char* cmd = argv[0];
   if (!strcmp(cmd, "fg")){
     if (argc != 2){
@@ -370,6 +413,12 @@ bool checkFg(int argc, char **argv, struct Node *head, struct Node* tail){
 }
 
 bool checkJob(int argc, char **argv, struct Node *head, struct Node *tail){
+  /*
+  This functionality supports job command.
+    It checks whether the command is invalid or not.
+    If it isn't, it prints out the error.
+    If it is, print all stopped processes.
+  */
   const char* cmd = argv[0];
   if (!strcmp(cmd, "jobs")){
     if (argc != 1){
@@ -384,6 +433,9 @@ bool checkJob(int argc, char **argv, struct Node *head, struct Node *tail){
 }
 
 void execute(char **argv, char *lineCmd, struct Node *head){
+  /*
+  This functionality combine functionalities together.
+  */
   pid_t childPid = fork();
   if (childPid == 0) {
     if (!reDirect(argv))
@@ -393,7 +445,6 @@ void execute(char **argv, char *lineCmd, struct Node *head){
   } 
   else {
     // parent
-    
     int status=0;
     signal(SIGINT, nextRound);
     signal(SIGTSTP, nextRound);
@@ -407,7 +458,7 @@ void execute(char **argv, char *lineCmd, struct Node *head){
 }
 
 void prompt(){
-  
+  //define doubly linked list to support jobs and fg command
   struct Node *head = (struct Node *)malloc(sizeof(struct Node));
   struct Node *tail = (struct Node *)malloc(sizeof(struct Node));
   head -> next = tail;
@@ -417,13 +468,13 @@ void prompt(){
     header();
     
     //read and parse Command
-    
     char *lineCmd = readLine();
     if (!lineCmd)
       break;
     int argc = numArg(lineCmd);
     char **argv = parsingArgv(argc, lineCmd, " ");
     
+    //run cmd
     if (!changeDir(argc, argv) &&
         !exitTerm(argc, argv, head, tail) &&
         !checkFg(argc, argv, head, tail) &&
@@ -431,8 +482,11 @@ void prompt(){
       
       execute(argv, lineCmd, head);
     }
+    //free dynamic memory 
     free_copied_args(argv, NULL);
   }
+
+  //free dynamic memory 
   clearList(head);
 }
 

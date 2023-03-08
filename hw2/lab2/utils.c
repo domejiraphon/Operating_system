@@ -37,6 +37,9 @@ void helper(char **args){
 
 
 void addNode(struct Node *head, char *cmd, pid_t pid){
+  /*
+  Add a node to the doubly linked list
+  */
   struct Node *cur = malloc(sizeof(struct Node));
   struct Node* next = head -> next;
   head -> next = cur;
@@ -48,6 +51,9 @@ void addNode(struct Node *head, char *cmd, pid_t pid){
 }
 
 struct Node *removeNode(struct Node *head, struct Node* tail, int idx){
+  /*
+    Remove a node to the doubly linked list
+  */
   if (idx < 0)
     return NULL;
   struct Node *cur = tail -> prev;
@@ -67,6 +73,9 @@ struct Node *removeNode(struct Node *head, struct Node* tail, int idx){
 }
 
 void printJobs(struct Node *head, struct Node *tail){
+  /*
+    Print all stopped jobs from the doubly linked list
+  */
   int i=1;
   tail = tail -> prev;
   while (tail && tail != head){
@@ -77,6 +86,9 @@ void printJobs(struct Node *head, struct Node *tail){
 }
 
 void clearList(struct Node *head){
+  /*
+    Free memory of the doubly linked list
+  */
   while (head){
     struct Node *next = head -> next;
     free(head);
@@ -85,13 +97,13 @@ void clearList(struct Node *head){
 }
 
 bool empty(struct Node *head, struct Node *tail){
-  int i=0;
+  /*
+    check if double linked list is empty or not.
+  */
   head = head -> next;
-  while (head && head != tail){
-    head = head -> next;
-    i++;
-  }
-  return i == 0;
+  if (head && head != tail)
+    return false;
+  return true;
 }
 
 
