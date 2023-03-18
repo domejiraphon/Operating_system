@@ -18,9 +18,11 @@ https://www.youtube.com/watch?v=_n2hE2gyPxU&ab_channel=CodeVault
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
+#include <getopt.h>
 #include "utils.h"
 #define SIZE_MAX 100000
 int num=0;
+
 char *readFile(char *file){
   int fd = open(file, O_RDONLY);
   if (fd == -1)
@@ -71,6 +73,18 @@ void encoder(int argc, char **argv){
 }
 
 int main(int argc, char **argv) {
+  int jobs = 1, opt;
+  while ((opt = getopt(argc, argv, "j:")) != -1) {
+    switch (opt) {
+    case 'j':
+      jobs = *optarg - '0';
+      break;
+    default:
+      fprintf(stderr, "Usage: %s [-j jobs] file ...\n");
+      exit(EXIT_FAILURE);
+    }
+  }
+  
   encoder(argc, argv);
   return 0;
 }
