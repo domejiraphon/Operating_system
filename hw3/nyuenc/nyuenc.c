@@ -80,6 +80,7 @@ void runLenthEncoding(struct Task *task){
   int idx = 0;
   for (int i=0; i<= n; i++){
     if ((i == n) || (i != 0 && content[i] != content[i-1])){
+      //printf("%c %d\n", content[i - 1] + '\0', rep);
       out[idx++] = content[i-1];
       out[idx++] = rep;
       rep = 1;
@@ -99,7 +100,7 @@ void *startThread(void *args){
     pthread_mutex_lock(&mutexQueue);
     while (numJobs == 0 && !submitAllJobs)
       pthread_cond_wait(&emptyQueue, &mutexQueue);
-    
+   
     if (numJobs == 0){
       pthread_mutex_unlock(&mutexQueue);
       break;
@@ -109,22 +110,48 @@ void *startThread(void *args){
     struct Task *cur = taskQueue[head++];
     pthread_mutex_unlock(&mutexQueue);
     runLenthEncoding(cur);
+    free(cur);
   }
   return NULL;
 }
-
+void merge(int i){
+  char *first = results[i];
+  char *second = results[i+1];
+  int idx=0;
+  /*
+  while (results[0][idx]){
+    printf("%c %d\n", results[0][idx], results[0][idx + 1]);
+    idx  += 2;
+  }
+  exit(0);
+  */
+  
+  if (results[i][resultsLength[i] - 2] == results[i+1][0]){
+    results[i+1][1] += results[i][resultsLength[i] - 1];
+    resultsLength[i] -= 2;
+  }
+    
+}
+void combineResults(){
+  int i=0;
+  while (results[i + 1]){
+    merge(i++);
+  }
+  
+}
 void encoder(int argc, int numThreads, char **argv){
   pthread_t thread[numThreads];
   pthread_mutex_init(&mutexQueue, NULL);
   pthread_cond_init(&emptyQueue, NULL);
   
   
+  readFileAndSplit(argv[1]);
   
   for (int i=0; i<numThreads; i++){
     if (pthread_create(&thread[i], NULL, &startThread, NULL))
       printf("Failed to create a thread");
   }
-  readFileAndSplit(argv[1]);
+  
   
   for (int i = 0; i<numThreads; i++) {
     if (pthread_join(thread[i], NULL) != 0) {
@@ -132,7 +159,7 @@ void encoder(int argc, int numThreads, char **argv){
     }
   }
   
-
+  combineResults();
   for (int i=0; i<MAX_TASKS; i++){
     write(1, results[i], resultsLength[i]);
     free(results[i]);
