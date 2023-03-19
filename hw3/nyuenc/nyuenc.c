@@ -21,8 +21,9 @@ https://stackoverflow.com/a/26989434
 #include <sys/stat.h>
 #include <getopt.h>
 #include "utils.h"
-#define SIZE_MAX 17000
+
 #define CHUNK_SIZE 4096
+#define SIZE_MAX 8192
 #define MAX_TASKS 10000
 
 bool submitAllJobs = false;
@@ -41,7 +42,6 @@ int resultsLength[MAX_TASKS];
 int head=0;
 
 void submitJobs(int fd, int i, size_t length){
-  pthread_mutex_lock(&mutexQueue);
   char *content = mmap(NULL, length, PROT_READ, MAP_PRIVATE, fd, i * CHUNK_SIZE);
   if (content == MAP_FAILED)
     printf("mmap failed");
@@ -50,8 +50,6 @@ void submitJobs(int fd, int i, size_t length){
   currentJobs -> content = content;
   currentJobs -> num = length;
   taskQueue[i] = currentJobs;
-  pthread_mutex_unlock(&mutexQueue);
-  pthread_cond_signal(&emptyQueue);
 }
 
 void readFileAndSplit(char *file){
@@ -64,10 +62,13 @@ void readFileAndSplit(char *file){
   int totalFileSize = sb.st_size / sizeof(char);
   int i=0;
   while (totalFileSize > 0){
+    pthread_mutex_lock(&mutexQueue);
     submitJobs(fd, i++, 
       (totalFileSize < CHUNK_SIZE) ? totalFileSize : CHUNK_SIZE);
     totalFileSize -= CHUNK_SIZE;
     numJobs++;
+    pthread_mutex_unlock(&mutexQueue);
+    pthread_cond_signal(&emptyQueue);
   }
   submitAllJobs = true;
 }
@@ -114,6 +115,7 @@ void *startThread(void *args){
   }
   return NULL;
 }
+
 void merge(int i){
   char *first = results[i];
   char *second = results[i+1];
@@ -132,27 +134,31 @@ void merge(int i){
   }
     
 }
+
 void combineResults(){
   int i=0;
   while (results[i + 1]){
     merge(i++);
   }
-  
 }
-void encoder(int argc, int numThreads, char **argv){
+
+void encoder(int argc, int numThreads, char **argv, bool foundOpt){
   pthread_t thread[numThreads];
   pthread_mutex_init(&mutexQueue, NULL);
   pthread_cond_init(&emptyQueue, NULL);
   
   
-  readFileAndSplit(argv[1]);
+  
   
   for (int i=0; i<numThreads; i++){
     if (pthread_create(&thread[i], NULL, &startThread, NULL))
       printf("Failed to create a thread");
   }
+  for (int i=(foundOpt) ? 3 : 1; i<argc && strcmp(argv[i], ">"); i++){
+    readFileAndSplit(argv[i]);
+  }
   
-  
+
   for (int i = 0; i<numThreads; i++) {
     if (pthread_join(thread[i], NULL) != 0) {
       perror("Failed to join the thread");
@@ -171,15 +177,16 @@ void encoder(int argc, int numThreads, char **argv){
 
   pthread_mutex_destroy(&mutexQueue);
   pthread_cond_destroy(&emptyQueue);
-  exit(0);
 }
 
 int main(int argc, char **argv) {
   int numThreads = 1, opt;
+  bool foundOpt=false;
   while ((opt = getopt(argc, argv, "j:")) != -1) {
     switch (opt) {
     case 'j':
       numThreads = *optarg - '0';
+      foundOpt = true;
       break;
     default:
       fprintf(stderr, "Usage: ./nyuenc [-j numThreads] file ...\n");
@@ -187,6 +194,8 @@ int main(int argc, char **argv) {
     }
   }
   
-  encoder(argc, numThreads, argv);
+  encoder(argc, numThreads, argv, foundOpt);
+  
+  
   return 0;
 }
