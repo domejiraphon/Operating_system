@@ -20,15 +20,14 @@ https://stackoverflow.com/a/26989434
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <getopt.h>
-//#include "utils.h"
 
 #define CHUNK_SIZE 4096
 #define SIZE_MAX 8192
-#define MAX_TASKS 10000000
+#define MAX_TASKS 250000
 
 bool submitAllJobs = false;
 pthread_mutex_t mutexQueue;
-pthread_mutex_t submitMutex;
+pthread_mutex_t writeMutex;
 pthread_cond_t emptyQueue;
 
 struct Task {
@@ -43,15 +42,10 @@ int resultsLength[MAX_TASKS];
 int head=0;
 int taskId=0;
 
-void submitJobs(int fd, int i, size_t length, int offset){
-  char *content = mmap(NULL, length, PROT_READ, MAP_PRIVATE, fd, offset * CHUNK_SIZE);
-  if (content == MAP_FAILED)
-    printf("mmap failed");
-  
+void submitJobs(char *content, int i, size_t length, int offset){
   struct Task *currentJobs = (struct Task *)malloc(sizeof(struct Task));
   currentJobs -> id = i;
-  
-  currentJobs -> content = content;
+  currentJobs -> content = content + offset * CHUNK_SIZE;
   currentJobs -> num = length;
   taskQueue[i] = currentJobs;
 }
@@ -69,19 +63,23 @@ void readFileAndSplit(int argc, char **argv, bool foundOpt){
     int totalFileSize = sb.st_size / sizeof(char);
 
     int offset=0;
+    char *content = mmap(NULL, totalFileSize, PROT_READ, MAP_PRIVATE, fd, 0);
+    if (content == MAP_FAILED)
+      printf("mmap failed");
     while (totalFileSize > 0){
-      pthread_mutex_lock(&mutexQueue);
-      submitJobs(fd, taskId++, 
+      
+      submitJobs(content, taskId++, 
         (totalFileSize < CHUNK_SIZE) ? totalFileSize : CHUNK_SIZE, offset++);
       totalFileSize -= CHUNK_SIZE;
+      pthread_mutex_lock(&mutexQueue);
       numJobs++;
-      
       pthread_mutex_unlock(&mutexQueue);
       pthread_cond_signal(&emptyQueue);
     }
     close(fd);
   }
   submitAllJobs = true;
+
 }
 
 void runLenthEncoding(struct Task *task){
@@ -101,13 +99,16 @@ void runLenthEncoding(struct Task *task){
       rep++;
   }
   
+  //pthread_mutex_lock(&writeMutex);
   results[task -> id] = out;
   resultsLength[task -> id] = idx;
+  //pthread_mutex_unlock(&writeMutex);
+  
   //printf("%d: %s", task -> id, results[task -> id]);
   //fflush(stdout);
 }
 
-void *startThread(void *args){
+void *startThread(){
   while (1){
     pthread_mutex_lock(&mutexQueue);
     while (numJobs == 0 && !submitAllJobs)
@@ -126,19 +127,7 @@ void *startThread(void *args){
   }
   return NULL;
 }
-
 void merge(int i){
-  char *first = results[i];
-  char *second = results[i+1];
-  int idx=0;
-  /*
-  while (results[0][idx]){
-    printf("%c %d\n", results[0][idx], results[0][idx + 1]);
-    idx  += 2;
-  }
-  exit(0);
-  */
-  
   if (results[i][resultsLength[i] - 2] == results[i+1][0]){
     results[i+1][1] += results[i][resultsLength[i] - 1];
     resultsLength[i] -= 2;
@@ -156,8 +145,9 @@ void combineResults(){
 void encoder(int argc, int numThreads, char **argv, bool foundOpt){
   pthread_t thread[numThreads];
   pthread_mutex_init(&mutexQueue, NULL);
-  pthread_mutex_init(&submitMutex, NULL);
+  pthread_mutex_init(&writeMutex, NULL);
   pthread_cond_init(&emptyQueue, NULL);
+  
   
   for (int i=0; i<numThreads; i++){
     if (pthread_create(&thread[i], NULL, &startThread, NULL))
@@ -171,19 +161,13 @@ void encoder(int argc, int numThreads, char **argv, bool foundOpt){
       perror("Failed to join the thread");
     }
   }
-  
   combineResults();
   for (int i=0; i < taskId; i++){
     write(1, results[i], resultsLength[i]);
     free(results[i]);
   }
-    
-    //write(1, results[i], resultsLength[i]);
-    
-  
-
   pthread_mutex_destroy(&mutexQueue);
-  pthread_mutex_destroy(&submitMutex);
+  pthread_mutex_destroy(&writeMutex);
   pthread_cond_destroy(&emptyQueue);
 }
 
