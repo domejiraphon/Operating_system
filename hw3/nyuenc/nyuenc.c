@@ -42,8 +42,8 @@ char *results[MAX_TASKS];
 int resultsLength[MAX_TASKS];
 int head=0;
 
-void submitJobs(int fd, int i, size_t length){
-  char *content = mmap(NULL, length, PROT_READ, MAP_PRIVATE, fd, i * CHUNK_SIZE);
+void submitJobs(int fd, int i, size_t length, int offset){
+  char *content = mmap(NULL, length, PROT_READ, MAP_PRIVATE, fd, offset * CHUNK_SIZE);
   if (content == MAP_FAILED)
     printf("mmap failed");
   
@@ -55,27 +55,34 @@ void submitJobs(int fd, int i, size_t length){
   taskQueue[i] = currentJobs;
 }
 
-void readFileAndSplit(char *file, int *i){
-  int fd = open(file, O_RDONLY);
-  if (fd == -1)
-    printf("Error openning the file");
+void readFileAndSplit(int argc, char **argv, bool foundOpt){
+  int fd;
   struct stat sb;
-  if (fstat(fd, &sb) == -1)
-    printf("Error getting file information");
-  int totalFileSize = sb.st_size / sizeof(char);
-  while (totalFileSize > 0){
-    pthread_mutex_lock(&mutexQueue);
-    submitJobs(fd, (*i)++, 
-      (totalFileSize < CHUNK_SIZE) ? totalFileSize : CHUNK_SIZE);
-    totalFileSize -= CHUNK_SIZE;
-    numJobs++;
-    
-    pthread_mutex_unlock(&mutexQueue);
-    pthread_cond_signal(&emptyQueue);
+  int taskId=0;
+  for (int i=(foundOpt) ? 3 : 1; i<argc && strcmp(argv[i], ">"); i++){
+    fd = open(argv[i], O_RDONLY);
+    if (fd == -1)
+      printf("Error openning the file");
+    if (fstat(fd, &sb) == -1)
+      printf("Error getting file information");
+    int totalFileSize = sb.st_size / sizeof(char);
+
+    int offset=0;
+    while (totalFileSize > 0){
+      pthread_mutex_lock(&mutexQueue);
+      submitJobs(fd, taskId++, 
+        (totalFileSize < CHUNK_SIZE) ? totalFileSize : CHUNK_SIZE, offset++);
+      totalFileSize -= CHUNK_SIZE;
+      numJobs++;
+      
+      pthread_mutex_unlock(&mutexQueue);
+      pthread_cond_signal(&emptyQueue);
+    }
+    close(fd);
   }
-  close(fd);
   submitAllJobs = true;
 }
+
 
 void runLenthEncoding(struct Task *task){
   int rep=0;
@@ -158,17 +165,14 @@ void encoder(int argc, int numThreads, char **argv, bool foundOpt){
       printf("Failed to create a thread");
   }
   
-  int taskIdx=0;
-  for (int i=(foundOpt) ? 3 : 1; i<argc && strcmp(argv[i], ">"); i++){
-    readFileAndSplit(argv[i], &taskIdx);
-  }
+  readFileAndSplit(argc, argv, foundOpt);
   
   for (int i = 0; i<numThreads; i++) {
     if (pthread_join(thread[i], NULL) != 0) {
       perror("Failed to join the thread");
     }
   }
- 
+  
   combineResults();
   for (int i=0; i<MAX_TASKS; i++){
     write(1, results[i], resultsLength[i]);
