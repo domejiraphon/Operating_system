@@ -20,7 +20,7 @@ https://stackoverflow.com/a/26989434
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <getopt.h>
-#include "utils.h"
+//#include "utils.h"
 
 #define CHUNK_SIZE 4096
 #define SIZE_MAX 8192
@@ -28,6 +28,7 @@ https://stackoverflow.com/a/26989434
 
 bool submitAllJobs = false;
 pthread_mutex_t mutexQueue;
+pthread_mutex_t submitMutex;
 pthread_cond_t emptyQueue;
 
 struct Task {
@@ -45,14 +46,16 @@ void submitJobs(int fd, int i, size_t length){
   char *content = mmap(NULL, length, PROT_READ, MAP_PRIVATE, fd, i * CHUNK_SIZE);
   if (content == MAP_FAILED)
     printf("mmap failed");
+  
   struct Task *currentJobs = (struct Task *)malloc(sizeof(struct Task));
   currentJobs -> id = i;
+  
   currentJobs -> content = content;
   currentJobs -> num = length;
   taskQueue[i] = currentJobs;
 }
 
-void readFileAndSplit(char *file){
+void readFileAndSplit(char *file, int *i){
   int fd = open(file, O_RDONLY);
   if (fd == -1)
     printf("Error openning the file");
@@ -60,16 +63,17 @@ void readFileAndSplit(char *file){
   if (fstat(fd, &sb) == -1)
     printf("Error getting file information");
   int totalFileSize = sb.st_size / sizeof(char);
-  int i=0;
   while (totalFileSize > 0){
     pthread_mutex_lock(&mutexQueue);
-    submitJobs(fd, i++, 
+    submitJobs(fd, (*i)++, 
       (totalFileSize < CHUNK_SIZE) ? totalFileSize : CHUNK_SIZE);
     totalFileSize -= CHUNK_SIZE;
     numJobs++;
+    
     pthread_mutex_unlock(&mutexQueue);
     pthread_cond_signal(&emptyQueue);
   }
+  close(fd);
   submitAllJobs = true;
 }
 
@@ -145,26 +149,26 @@ void combineResults(){
 void encoder(int argc, int numThreads, char **argv, bool foundOpt){
   pthread_t thread[numThreads];
   pthread_mutex_init(&mutexQueue, NULL);
+  pthread_mutex_init(&submitMutex, NULL);
   pthread_cond_init(&emptyQueue, NULL);
-  
-  
   
   
   for (int i=0; i<numThreads; i++){
     if (pthread_create(&thread[i], NULL, &startThread, NULL))
       printf("Failed to create a thread");
   }
+  
+  int taskIdx=0;
   for (int i=(foundOpt) ? 3 : 1; i<argc && strcmp(argv[i], ">"); i++){
-    readFileAndSplit(argv[i]);
+    readFileAndSplit(argv[i], &taskIdx);
   }
   
-
   for (int i = 0; i<numThreads; i++) {
     if (pthread_join(thread[i], NULL) != 0) {
       perror("Failed to join the thread");
     }
   }
-  
+ 
   combineResults();
   for (int i=0; i<MAX_TASKS; i++){
     write(1, results[i], resultsLength[i]);
@@ -176,6 +180,7 @@ void encoder(int argc, int numThreads, char **argv, bool foundOpt){
   
 
   pthread_mutex_destroy(&mutexQueue);
+  pthread_mutex_destroy(&submitMutex);
   pthread_cond_destroy(&emptyQueue);
 }
 
@@ -195,7 +200,5 @@ int main(int argc, char **argv) {
   }
   
   encoder(argc, numThreads, argv, foundOpt);
-  
-  
   return 0;
 }
