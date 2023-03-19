@@ -24,7 +24,7 @@ https://stackoverflow.com/a/26989434
 
 #define CHUNK_SIZE 4096
 #define SIZE_MAX 8192
-#define MAX_TASKS 10000
+#define MAX_TASKS 10000000
 
 bool submitAllJobs = false;
 pthread_mutex_t mutexQueue;
@@ -41,6 +41,7 @@ int numJobs=0;
 char *results[MAX_TASKS];
 int resultsLength[MAX_TASKS];
 int head=0;
+int taskId=0;
 
 void submitJobs(int fd, int i, size_t length, int offset){
   char *content = mmap(NULL, length, PROT_READ, MAP_PRIVATE, fd, offset * CHUNK_SIZE);
@@ -58,7 +59,7 @@ void submitJobs(int fd, int i, size_t length, int offset){
 void readFileAndSplit(int argc, char **argv, bool foundOpt){
   int fd;
   struct stat sb;
-  int taskId=0;
+  
   for (int i=(foundOpt) ? 3 : 1; i<argc && strcmp(argv[i], ">"); i++){
     fd = open(argv[i], O_RDONLY);
     if (fd == -1)
@@ -82,7 +83,6 @@ void readFileAndSplit(int argc, char **argv, bool foundOpt){
   }
   submitAllJobs = true;
 }
-
 
 void runLenthEncoding(struct Task *task){
   int rep=0;
@@ -159,7 +159,6 @@ void encoder(int argc, int numThreads, char **argv, bool foundOpt){
   pthread_mutex_init(&submitMutex, NULL);
   pthread_cond_init(&emptyQueue, NULL);
   
-  
   for (int i=0; i<numThreads; i++){
     if (pthread_create(&thread[i], NULL, &startThread, NULL))
       printf("Failed to create a thread");
@@ -174,7 +173,7 @@ void encoder(int argc, int numThreads, char **argv, bool foundOpt){
   }
   
   combineResults();
-  for (int i=0; i<MAX_TASKS; i++){
+  for (int i=0; i < taskId; i++){
     write(1, results[i], resultsLength[i]);
     free(results[i]);
   }
