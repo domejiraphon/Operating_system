@@ -7,6 +7,7 @@ https://stackoverflow.com/questions/13975760/split-files-into-fixed-size-blocks-
 https://gist.github.com/marcetcheverry/991042
 https://www.youtube.com/watch?v=_n2hE2gyPxU&ab_channel=CodeVault
 https://stackoverflow.com/a/26989434
+https://stackoverflow.com/questions/6979892/how-to-free-memory-allocated-using-mmap
 */
 #include <ctype.h>
 #include <stdio.h>
@@ -22,7 +23,7 @@ https://stackoverflow.com/a/26989434
 #include <getopt.h>
 
 #define CHUNK_SIZE 4096
-#define SIZE_MAX 8192
+#define SIZE_MAX 50
 #define MAX_TASKS 250000
 
 bool submitAllJobs = false;
@@ -68,14 +69,17 @@ void readFileAndSplit(int argc, char **argv, bool foundOpt){
       printf("mmap failed");
     while (totalFileSize > 0){
       
+
       submitJobs(content, taskId++, 
         (totalFileSize < CHUNK_SIZE) ? totalFileSize : CHUNK_SIZE, offset++);
       totalFileSize -= CHUNK_SIZE;
       pthread_mutex_lock(&mutexQueue);
       numJobs++;
-      pthread_mutex_unlock(&mutexQueue);
       pthread_cond_signal(&emptyQueue);
+      pthread_mutex_unlock(&mutexQueue);
+      
     }
+    munmap(content, totalFileSize);
     close(fd);
   }
   submitAllJobs = true;
@@ -127,6 +131,7 @@ void *startThread(){
   }
   return NULL;
 }
+
 void merge(int i){
   if (results[i][resultsLength[i] - 2] == results[i+1][0]){
     results[i+1][1] += results[i][resultsLength[i] - 1];
@@ -148,16 +153,16 @@ void encoder(int argc, int numThreads, char **argv, bool foundOpt){
   pthread_mutex_init(&writeMutex, NULL);
   pthread_cond_init(&emptyQueue, NULL);
   
-  
+  readFileAndSplit(argc, argv, foundOpt);
   for (int i=0; i<numThreads; i++){
     if (pthread_create(&thread[i], NULL, &startThread, NULL))
       printf("Failed to create a thread");
   }
   
-  readFileAndSplit(argc, argv, foundOpt);
+  
   
   for (int i = 0; i<numThreads; i++) {
-    if (pthread_join(thread[i], NULL) != 0) {
+    if (pthread_join(thread[i], NULL)) {
       perror("Failed to join the thread");
     }
   }
@@ -166,6 +171,7 @@ void encoder(int argc, int numThreads, char **argv, bool foundOpt){
     write(1, results[i], resultsLength[i]);
     free(results[i]);
   }
+
   pthread_mutex_destroy(&mutexQueue);
   pthread_mutex_destroy(&writeMutex);
   pthread_cond_destroy(&emptyQueue);
@@ -185,7 +191,6 @@ int main(int argc, char **argv) {
       exit(EXIT_FAILURE);
     }
   }
-  
   encoder(argc, numThreads, argv, foundOpt);
   return 0;
 }
