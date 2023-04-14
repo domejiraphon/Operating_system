@@ -66,8 +66,8 @@ void listRootDir(char *disk){
   int numEntry= 0;
   
   while (curBlock < 0x0ffffff8) {
-    numEntry += listDir(curBlock - 2, fs, boot);
-    curBlock = *((int *) fat + (curBlock - 2));
+    numEntry += listDir(curBlock - boot -> BPB_RootClus, fs, boot);
+    curBlock = *((int *) fat + (curBlock - boot -> BPB_RootClus));
   }
   printf("Total number of entries = %d\n", numEntry);
 }
@@ -160,7 +160,6 @@ void setFAT(void *fs, BootEntry *boot, DirEntry *dirEntry){
   int offsetToFat = boot -> BPB_RsvdSecCnt * boot -> BPB_BytsPerSec;
   unsigned int *fat = (unsigned int *)((char *) fs + offsetToFat);
   
-  
   unsigned int offsetToBlock = (dirEntry -> DIR_FstClusHI << 16) | dirEntry -> DIR_FstClusLO;
  
   int leftFileSize = dirEntry -> DIR_FileSize;
@@ -176,60 +175,81 @@ void recoveryFile(char *disk, char *fileToRecover){
   void *fs = readFileSystem(disk);
   BootEntry *boot = (BootEntry *)fs;
   int offset = (boot -> BPB_RsvdSecCnt
-                + boot -> BPB_NumFATs * boot -> BPB_FATSz32
-                + boot -> BPB_RootClus - 2) * boot -> BPB_BytsPerSec;
+                + boot -> BPB_NumFATs * boot -> BPB_FATSz32) * boot -> BPB_BytsPerSec;
   
   DirEntry *dirEntry = (DirEntry *) ((char *)fs + offset);
   int count=0;
   int maxEntry = boot -> BPB_BytsPerSec / DIRENTRY_SIZE;
+  DirEntry *tmp = NULL;
   while (dirEntry -> DIR_Name[0] != 0x00 && count < maxEntry){
     count++;
   
     if (dirEntry -> DIR_Attr != 0x10 
         &&dirEntry -> DIR_Name[0] == 0xE5 
         && checkSameFile(dirEntry, fileToRecover)){
-      dirEntry -> DIR_Name[0] = fileToRecover[0];
-      setFAT(fs, boot, dirEntry);
-      printf("%s: successfully recovered\n", fileToRecover);
-      return;
+      if (tmp){
+        printf("%s: multiple candidates found\n", fileToRecover);
+        return;
+      }
+      tmp = dirEntry;
     }
     dirEntry++;
+  }
+  if (tmp){
+    tmp -> DIR_Name[0] = fileToRecover[0];
+    setFAT(fs, boot, tmp);
+    printf("%s: successfully recovered\n", fileToRecover);
+    return;
   }
   printf("%s: file not found\n", fileToRecover);
 }
 
 int main(int argc, char **argv) {
   int opt;
-  bool checkFS=false, checkRoot=false;
-  char *filename=NULL;
+  bool checkFS=false, checkRoot=false, sha=false;
+  char *filenameCont=NULL;
+  char *filenameNonCont=NULL;
   if (argc < 2)
     printUsage();
   while ((opt = getopt(argc, argv, "ilr:s:R:")) != -1) {
     switch (opt) {
     case 'i':
+      if (checkFS || checkRoot || filenameCont || filenameNonCont || sha)
+        printUsage();
       checkFS = true;
       break;
     case 'l':
+      if (checkFS || checkRoot || filenameCont || filenameNonCont || sha)
+        printUsage();
       checkRoot = true;
       break;
     case 'r':
-      filename = optarg;
+      if (checkFS || checkRoot || filenameNonCont)
+        printUsage();
+      filenameCont = optarg;
       break;
     case 's':
+      if (checkFS || checkRoot || strcmp(optarg, "sha1"))
+        printUsage();
+      sha = true;
       break;
     case 'R':
+      if (checkFS || checkRoot || filenameCont)
+        printUsage();
+      filenameNonCont = optarg;
       break;
     default:
       printUsage();
     }
   }
+
   if (optind >= argc)
     printUsage();
   if (checkFS)
     printFileSystem(argv[optind]);
   else if (checkRoot)
     listRootDir(argv[optind]);
-  else if (filename)
-    recoveryFile(argv[optind], filename);
+  else if (filenameCont)
+    recoveryFile(argv[optind], filenameCont);
   return 0;
 }
