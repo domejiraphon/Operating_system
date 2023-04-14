@@ -1,6 +1,7 @@
 /*
 https://stackoverflow.com/questions/6449935/increment-void-pointer-by-one-byte-by-two
 https://gist.github.com/Gydo194/a0cec0ba27109a3f5d6317356fed8473
+https://www.geeksforgeeks.org/strtok-strtok_r-functions-c-examples/
 */
 #include <ctype.h>
 #include <stdio.h>
@@ -55,19 +56,30 @@ int listDir(int numBlock, void *fs, BootEntry *boot);
 void listRootDir(char *disk){
   void *fs = readFileSystem(disk);
   BootEntry *boot = (BootEntry *)fs;
-  int offset = boot -> BPB_RsvdSecCnt * boot -> BPB_SecPerClus * boot -> BPB_BytsPerSec;
+  int offset = boot -> BPB_RsvdSecCnt * boot -> BPB_BytsPerSec;
   void *fat = ((char *) fs) + offset;
   
   int curBlock = boot -> BPB_RootClus;
   
   int numEntry= 0;
-
+  
   while (curBlock < 0x0ffffff8) {
     numEntry += listDir(curBlock - 2, fs, boot);
     curBlock = *((int *) fat + (curBlock - 2));
-    //printf("%d\n", curBlock);
   }
   printf("Total number of entries = %d\n", numEntry);
+}
+
+void parsingName(unsigned char *dirName, char *filename, 
+                char *filetype, bool skip, const char *delim){
+
+  for (int i=(skip) ? 1 : 0; 
+      i<FILENAME_SIZE && dirName[i] != *delim; i++)
+    filename[i - skip] = dirName[i]; 
+  
+  for (int i=FILENAME_SIZE; i<FILENAME_SIZE + FILETYPE_SIZE 
+      && dirName[i] != *delim; i++)
+    filetype[i - FILENAME_SIZE] = dirName[i];
 }
 
 int listDir(int numBlock, void *fs, BootEntry *boot){
@@ -76,31 +88,36 @@ int listDir(int numBlock, void *fs, BootEntry *boot){
   
   int offset = (boot -> BPB_RsvdSecCnt
                 + boot -> BPB_NumFATs * boot -> BPB_FATSz32
-                + numBlock) * boot -> BPB_SecPerClus * boot -> BPB_BytsPerSec;
+                + numBlock) * boot -> BPB_BytsPerSec;
   //write(1, ((char *)fs) + offset, boot -> BPB_BytsPerSec);
   int numEntry=0;
   DirEntry *dirEntry = (DirEntry *) ((char *)fs + offset);
-  while (dirEntry -> DIR_Name[0] != 0x00){
+  int count=0;
+  int maxEntry = boot -> BPB_BytsPerSec / DIRENTRY_SIZE;
+  while (dirEntry -> DIR_Name[0] != 0x00 && count < maxEntry){
+    count++;
     if (dirEntry -> DIR_Name[0] == 0xE5){
       dirEntry++;
       continue;
     }
     char filename[FILENAME_SIZE + 1] = {'\0'};
     char filetype[FILETYPE_SIZE + 1] = {'\0'};
-    int i=0;
-    for (; i<FILENAME_SIZE && dirEntry -> DIR_Name[i] != ' '; i++)
-      filename[i] = dirEntry -> DIR_Name[i]; 
   
-    for (int i=FILENAME_SIZE; i<FILENAME_SIZE + FILETYPE_SIZE 
-        && dirEntry -> DIR_Name[i] != ' '; i++)
-      filetype[i - FILENAME_SIZE] = dirEntry -> DIR_Name[i];
+    parsingName(dirEntry -> DIR_Name, filename, filetype, false, " ");
 
-    if (dirEntry -> DIR_Attr != 0x10 && dirEntry -> DIR_FileSize)
-      printf("%s.%s (size = %d, starting cluster = %d)\n", 
+    if (dirEntry -> DIR_Attr != 0x10 && dirEntry -> DIR_FileSize){
+      if (filetype[0] != '\0')
+        printf("%s.%s (size = %d, starting cluster = %d)\n", 
             filename,
             filetype,
             dirEntry -> DIR_FileSize,
             dirEntry -> DIR_FstClusLO);
+      else 
+        printf("%s (size = %d, starting cluster = %d)\n", 
+            filename,
+            dirEntry -> DIR_FileSize,
+            dirEntry -> DIR_FstClusLO);
+    }
     else if (dirEntry -> DIR_Attr != 0x10 && !dirEntry -> DIR_FileSize)
       printf("%s (size = 0)\n", filename);
     else
@@ -113,18 +130,59 @@ int listDir(int numBlock, void *fs, BootEntry *boot){
   return numEntry;
 }
 
-void printUsage(){
-  fprintf(stderr, "Usage: ./nyufile disk <options>\n"
-                      "  -i                     Print the file system information.\n"
-                      "  -l                     List the root directory.\n"
-                      "  -r filename [-s sha1]  Recover a contiguous file.\n"
-                      "  -R filename -s sha1    Recover a possibly non-contiguous file.\n");
-  exit(EXIT_FAILURE);
+bool checkSameFile(DirEntry *dirEntry, char *fileToRecover){
+  char filename[FILENAME_SIZE + 1] = {'\0'};
+  char filetype[FILETYPE_SIZE + 1] = {'\0'};
+ 
+  parsingName(dirEntry -> DIR_Name, filename, filetype, true, " ");
+
+  char filenameToRecover[FILENAME_SIZE + 1] = {'\0'};
+  char filetypeToRecover[FILETYPE_SIZE + 1] = {'\0'};
+
+  parsingName2(fileToRecover, filenameToRecover, filetypeToRecover, ".");
+  /*
+  printf("%s\n", filename);
+  printf("%s\n", filenameToRecover);
+  printf("%s\n", filetype);
+  printf("%s", filetypeToRecover);
+  exit(0);
+  */
+  
+  if (strcmp(filename, filenameToRecover) == 0
+      && strcmp(filetype, filetypeToRecover) == 0)
+      return true;
+  return false;
+}
+
+void recoveryFile(char *disk, char *fileToRecover){
+  void *fs = readFileSystem(disk);
+  BootEntry *boot = (BootEntry *)fs;
+  int offset = (boot -> BPB_RsvdSecCnt
+                + boot -> BPB_NumFATs * boot -> BPB_FATSz32
+                + boot -> BPB_RootClus - 2) * boot -> BPB_BytsPerSec;
+  
+  DirEntry *dirEntry = (DirEntry *) ((char *)fs + offset);
+  int count=0;
+  int maxEntry = boot -> BPB_BytsPerSec / DIRENTRY_SIZE;
+  while (dirEntry -> DIR_Name[0] != 0x00 && count < maxEntry){
+    count++;
+  
+    if (dirEntry -> DIR_Name[0] == 0xE5 
+        && checkSameFile(dirEntry, fileToRecover)){
+      dirEntry -> DIR_Name[0] = fileToRecover[0];
+     
+      printf("%s: successfully recovered\n", fileToRecover);
+      return;
+    }
+    dirEntry++;
+  }
+  printf("%s: file not found\n", fileToRecover);
 }
 
 int main(int argc, char **argv) {
   int opt;
   bool checkFS=false, checkRoot=false;
+  char *filename=NULL;
   if (argc < 2)
     printUsage();
   while ((opt = getopt(argc, argv, "ilr:s:R:")) != -1) {
@@ -136,6 +194,7 @@ int main(int argc, char **argv) {
       checkRoot = true;
       break;
     case 'r':
+      filename = optarg;
       break;
     case 's':
       break;
@@ -151,5 +210,7 @@ int main(int argc, char **argv) {
     printFileSystem(argv[optind]);
   else if (checkRoot)
     listRootDir(argv[optind]);
+  else if (filename)
+    recoveryFile(argv[optind], filename);
   return 0;
 }

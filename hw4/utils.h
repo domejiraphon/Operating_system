@@ -50,5 +50,6 @@ typedef struct DirEntry {
 } DirEntry;
 
 #pragma pack(pop)
-
+void printUsage();
+void parsingName2(char *, char *, char *, const char *);
 #endif
