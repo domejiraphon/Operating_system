@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
+
 void printUsage(){
   fprintf(stderr, "Usage: ./nyufile disk <options>\n"
                       "  -i                     Print the file system information.\n"
@@ -12,7 +13,6 @@ void printUsage(){
                       "  -R filename -s sha1    Recover a possibly non-contiguous file.\n");
   exit(EXIT_FAILURE);
 }
-
 
 void parsingName2(char *str, char *filename, char *filetype, const char *delim){
   char *token;
