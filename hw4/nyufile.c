@@ -8,6 +8,7 @@ https://www.tutorialspoint.com/c_standard_library/c_function_memcpy.htm
 https://stackoverflow.com/questions/30146358/how-would-i-compare-2-unsigned-char-arrays
 https://www.tutorialspoint.com/c_standard_library/c_function_memcmp.htm
 https://stackoverflow.com/questions/3408706/hexadecimal-string-to-byte-array-in-c
+https://cplusplus.com/reference/cstring/memcpy/
 */
 #include <ctype.h>
 #include <stdio.h>
@@ -104,7 +105,6 @@ void parsingName(unsigned char *dirName, char *filename,
 }
 
 int listDir(int numBlock, void *fs, BootEntry *boot){
-  
   // (num_reserved + num_fat * fat_size + root_cluster) * bytes/cluster
   unsigned int offset = getOffsetToData(boot, numBlock);
   //write(1, ((char *)fs) + offset, boot -> BPB_BytsPerSec);
@@ -178,41 +178,65 @@ void setFAT(void *fs, BootEntry *boot, DirEntry *dirEntry){
   unsigned int *fat = (unsigned int *)((char *) fs + offsetToFat);
   
   unsigned int startBlock = getStartBlock(dirEntry);
-  unsigned int sizeBlock = boot -> BPB_BytsPerSec * boot -> BPB_SecPerClus;
+  unsigned int blockSize = boot -> BPB_BytsPerSec * boot -> BPB_SecPerClus;
 
   int leftFileSize = dirEntry -> DIR_FileSize;
   while (leftFileSize > 0){
-    *(fat + startBlock) = (leftFileSize <= sizeBlock) 
+    *(fat + startBlock) = (leftFileSize <= blockSize) 
           ? EOF: startBlock + 1;
     startBlock++;
-    leftFileSize -= sizeBlock;
+    leftFileSize -= blockSize;
   }
 }
 
 bool sameSHA(void *fs, BootEntry *boot, DirEntry *dirEntry, char *sha){
   unsigned int offsetToFat = getOffsetToFAT(boot);
-  unsigned int startBlock = getStartBlock(dirEntry);
-  unsigned int offsetToData = getOffsetToData(boot, startBlock);
+  
 
   unsigned int *fat = (unsigned int *)((char *) fs + offsetToFat);
-  unsigned char *data = (unsigned char *)((char *) fs + offsetToData);
+  
 
   unsigned char *fileContent = (unsigned char *)(malloc(sizeof(unsigned char) * dirEntry -> DIR_FileSize));
-  /*
-  //int fileSize = dirEntry -> DIR_FileSize;
-  printf("%d\n", offsetToData);
-  //offsetToBlock = 4608;
-  printf("%d\n", offsetToBlock);
-  */
   
-  memcpy(fileContent, data + offsetToData, dirEntry -> DIR_FileSize);
+  //int fileSize = dirEntry -> DIR_FileSize;
+ 
+  //offsetToBlock = 4608;
+  //printf("%d\n", offsetToBlock);
+  
+  int leftFileSize = dirEntry -> DIR_FileSize;
+  unsigned int startBlock = getStartBlock(dirEntry);
+  unsigned int blockSize = boot -> BPB_BytsPerSec * boot -> BPB_SecPerClus;
+  int idx=0;
+  while (leftFileSize > 0){
+    
+    unsigned int offsetToData = getOffsetToData(boot, startBlock++);
+   
+    unsigned char *data = (unsigned char *)((char *) fs + offsetToData);
+    unsigned int copySize = leftFileSize < blockSize ? leftFileSize : blockSize;
+    memcpy(fileContent + idx * blockSize, 
+          data, 
+          copySize);
+    idx++;
+    leftFileSize -= copySize;
+  }
+  
+  
   unsigned char md[SHA_DIGEST_LENGTH];
   SHA1(fileContent, dirEntry->DIR_FileSize, md);
-  printf("%d", sha);
-  printf("%d", memcmp(md, sha, SHA_DIGEST_LENGTH));
+  
+  unsigned char shaByte[SHA_DIGEST_LENGTH];
+  for (size_t i = 0; i < SHA_DIGEST_LENGTH; i++, sha += 2) 
+    sscanf(sha, "%2hhx", &shaByte[i]);
+  //printf("%s\n", fileContent);
+  /*
+  printf("%s\n", md);
+  printf("%s\n", shaByte);
+  printf("%d\n", memcmp(md, shaByte, SHA_DIGEST_LENGTH));
   exit(0);
-  if (memcmp(md, sha, SHA_DIGEST_LENGTH) == 0)
+  */
+  if (memcmp(md, shaByte, SHA_DIGEST_LENGTH) == 0)
     return true;
+  
   return false;
 }
 
@@ -220,7 +244,7 @@ void recoveryFile(char *disk, char *fileToRecover, char *sha){
   void *fs = readFileSystem(disk);
   BootEntry *boot = (BootEntry *)fs;
   unsigned int offset = getOffsetToData(boot, boot -> BPB_RootClus);
-
+  
   DirEntry *dirEntry = (DirEntry *) ((char *)fs + offset);
   int count=0;
   int maxEntry = (boot -> BPB_BytsPerSec * boot -> BPB_SecPerClus) / DIRENTRY_SIZE;
@@ -230,22 +254,30 @@ void recoveryFile(char *disk, char *fileToRecover, char *sha){
     if (dirEntry -> DIR_Attr != 0x10 
         &&dirEntry -> DIR_Name[0] == 0xE5 
         && checkSameFile(dirEntry, fileToRecover)){
+      
       if (!sha && tmp){
         printf("%s: multiple candidates found\n", fileToRecover);
         return;
       }
       if (sha){
-        sameSHA(fs, boot, dirEntry, sha);
+        if (sameSHA(fs, boot, dirEntry, sha)){
+          tmp = dirEntry;
+          break;
+        }
       }
       else
         tmp = dirEntry;
     }
     dirEntry++;
   }
+  
   if (tmp){
     tmp -> DIR_Name[0] = fileToRecover[0];
     setFAT(fs, boot, tmp);
-    printf("%s: successfully recovered\n", fileToRecover);
+    if (sha)
+      printf("%s: successfully recovered with SHA-1\n", fileToRecover);
+    else
+      printf("%s: successfully recovered\n", fileToRecover);
     return;
   }
   printf("%s: file not found\n", fileToRecover);
@@ -253,37 +285,38 @@ void recoveryFile(char *disk, char *fileToRecover, char *sha){
 
 int main(int argc, char **argv) {
   int opt;
-  bool checkFS=false, checkRoot=false;
+ 
   char *filenameCont=NULL;
   char *filenameNonCont=NULL;
   char *sha=NULL;
-
+  if (argc < 3)
+    printUsage();
+  char *disk = argv[1];
+  
   while ((opt = getopt(argc, argv, "ilr:s:R:")) != -1) {
     switch (opt) {
     case 'i':
       if (argc != 3)
         printUsage();
-      checkFS = true;
+      printFileSystem(disk);
       break;
     case 'l':
       if (argc != 3)
         printUsage();
-      checkRoot = true;
+      listRootDir(disk);
       break;
     case 'r':
-      if (checkFS || checkRoot || filenameNonCont)
-        printUsage();
       if (argc != 4 && argc != 6)
         printUsage();
       filenameCont = optarg;
       break;
     case 's':
-      if (argc !=6 || checkFS || checkRoot)
+      if (argc !=6)
         printUsage();
       sha = optarg;
       break;
     case 'R':
-      if (argc !=6 || checkFS || checkRoot || filenameCont)
+      if (argc !=6)
         printUsage();
       filenameNonCont = optarg;
       break;
@@ -291,13 +324,8 @@ int main(int argc, char **argv) {
       printUsage();
     }
   }
-  if (optind >= argc)
-    printUsage();
-  if (checkFS)
-    printFileSystem(argv[optind]);
-  else if (checkRoot)
-    listRootDir(argv[optind]);
-  else if (filenameCont)
-    recoveryFile(argv[optind], filenameCont, sha);
+  if (filenameCont)
+    recoveryFile(disk, filenameCont, sha);
+  
   return 0;
 }
