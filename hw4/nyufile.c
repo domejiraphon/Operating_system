@@ -43,8 +43,8 @@ void *readFileSystem(char *disk){
     fprintf(stderr, "Error getting file information");
 
   void *fs = mmap(NULL, sb.st_size, 
-                      PROT_READ | PROT_WRITE, 
-                      MAP_SHARED, fd, 0);
+                            PROT_READ | PROT_WRITE, 
+                            MAP_SHARED, fd, 0);
   close(fd);
   if (fs == MAP_FAILED)
     fprintf(stderr, "mmap failed");
@@ -76,18 +76,22 @@ unsigned int getStartBlock(DirEntry *dirEntry){
   return (dirEntry -> DIR_FstClusHI << 16) | dirEntry -> DIR_FstClusLO;
 }
 
+unsigned int getNextBlock(unsigned int *fat, unsigned int curBlock){
+  return *(fat + curBlock);
+}
+
 void listRootDir(char *disk){
-  void *fs = readFileSystem(disk);
+  unsigned int *fs = readFileSystem(disk);
   BootEntry *boot = (BootEntry *)fs;
   unsigned int offset = getOffsetToFAT(boot);
-  void *fat = ((char *) fs) + offset;
+  unsigned int *fat = (unsigned int *)((char *)fs + offset);
   
-  int curBlock = boot -> BPB_RootClus;
+  unsigned int curBlock = boot -> BPB_RootClus;
   int numEntry= 0;
   
   while (curBlock < 0x0ffffff8) {
     numEntry += listDir(curBlock, fs, boot);
-    curBlock = *((int *) fat + curBlock);
+    curBlock = getNextBlock(fat, curBlock);
   }
   printf("Total number of entries = %d\n", numEntry);
 }
@@ -105,9 +109,7 @@ void parsingName(unsigned char *dirName, char *filename,
 }
 
 int listDir(int numBlock, void *fs, BootEntry *boot){
-  // (num_reserved + num_fat * fat_size + root_cluster) * bytes/cluster
   unsigned int offset = getOffsetToData(boot, numBlock);
-  //write(1, ((char *)fs) + offset, boot -> BPB_BytsPerSec);
   int numEntry=0;
   DirEntry *dirEntry = (DirEntry *) ((char *)fs + offset);
   int count=0;
@@ -115,7 +117,7 @@ int listDir(int numBlock, void *fs, BootEntry *boot){
   
   while (dirEntry -> DIR_Name[0] != 0x00 && count < maxEntry){
     count++;
-    if (dirEntry -> DIR_Name[0] == 0xE5){
+    if (dirEntry -> DIR_Name[0] == 0xe5){
       dirEntry++;
       continue;
     }
@@ -123,26 +125,26 @@ int listDir(int numBlock, void *fs, BootEntry *boot){
     char filetype[FILETYPE_SIZE + 1] = {'\0'};
   
     parsingName(dirEntry -> DIR_Name, filename, filetype, false, " ");
-
+    unsigned int curBlock = getStartBlock(dirEntry);
     if (dirEntry -> DIR_Attr != 0x10 && dirEntry -> DIR_FileSize){
       if (filetype[0] != '\0')
         printf("%s.%s (size = %d, starting cluster = %d)\n", 
             filename,
             filetype,
             dirEntry -> DIR_FileSize,
-            dirEntry -> DIR_FstClusLO);
+            curBlock);
       else 
         printf("%s (size = %d, starting cluster = %d)\n", 
             filename,
             dirEntry -> DIR_FileSize,
-            dirEntry -> DIR_FstClusLO);
+            curBlock);
     }
     else if (dirEntry -> DIR_Attr != 0x10 && !dirEntry -> DIR_FileSize)
       printf("%s (size = 0)\n", filename);
     else
       printf("%s/ (starting cluster = %d)\n", 
             filename,
-            dirEntry -> DIR_FstClusLO);
+            curBlock);
     dirEntry++;
     numEntry++;
   }
@@ -159,13 +161,6 @@ bool checkSameFile(DirEntry *dirEntry, char *fileToRecover){
   char filetypeToRecover[FILETYPE_SIZE + 1] = {'\0'};
 
   parsingName2(fileToRecover, filenameToRecover, filetypeToRecover, ".");
-  /*
-  printf("%s\n", filename);
-  printf("%s\n", filenameToRecover);
-  printf("%s\n", filetype);
-  printf("%s", filetypeToRecover);
-  exit(0);
-  */
   
   if (strcmp(filename, filenameToRecover) == 0
       && strcmp(filetype, filetypeToRecover) == 0)
@@ -223,17 +218,11 @@ bool sameSHA(void *fs, BootEntry *boot, DirEntry *dirEntry, char *sha){
   
   unsigned char md[SHA_DIGEST_LENGTH];
   SHA1(fileContent, dirEntry->DIR_FileSize, md);
-  
+  free(fileContent);
   unsigned char shaByte[SHA_DIGEST_LENGTH];
   for (size_t i = 0; i < SHA_DIGEST_LENGTH; i++, sha += 2) 
     sscanf(sha, "%2hhx", &shaByte[i]);
-  //printf("%s\n", fileContent);
-  /*
-  printf("%s\n", md);
-  printf("%s\n", shaByte);
-  printf("%d\n", memcmp(md, shaByte, SHA_DIGEST_LENGTH));
-  exit(0);
-  */
+  
   if (memcmp(md, shaByte, SHA_DIGEST_LENGTH) == 0)
     return true;
   
@@ -243,42 +232,49 @@ bool sameSHA(void *fs, BootEntry *boot, DirEntry *dirEntry, char *sha){
 void recoveryFile(char *disk, char *fileToRecover, char *sha){
   void *fs = readFileSystem(disk);
   BootEntry *boot = (BootEntry *)fs;
-  unsigned int offset = getOffsetToData(boot, boot -> BPB_RootClus);
   
-  DirEntry *dirEntry = (DirEntry *) ((char *)fs + offset);
-  int count=0;
+  unsigned int offsetToFAT = getOffsetToFAT(boot);
+  unsigned int *fat = (unsigned int *)((char *)fs + offsetToFAT);
+
+  unsigned int curBlock = boot -> BPB_RootClus;
   int maxEntry = (boot -> BPB_BytsPerSec * boot -> BPB_SecPerClus) / DIRENTRY_SIZE;
-  DirEntry *tmp = NULL;
-  while (dirEntry -> DIR_Name[0] != 0x00 && count < maxEntry){
-    count++;
-    if (dirEntry -> DIR_Attr != 0x10 
-        &&dirEntry -> DIR_Name[0] == 0xE5 
-        && checkSameFile(dirEntry, fileToRecover)){
-      
-      if (!sha && tmp){
-        printf("%s: multiple candidates found\n", fileToRecover);
-        return;
-      }
-      if (sha){
-        if (sameSHA(fs, boot, dirEntry, sha)){
-          tmp = dirEntry;
-          break;
+  while (curBlock < 0x0ffffff8) {
+    unsigned int offsetToData = getOffsetToData(boot, curBlock);
+    DirEntry *dirEntry = (DirEntry *) ((char *)fs + offsetToData);
+    DirEntry *tmp = NULL;
+    int count=0;
+    while (dirEntry -> DIR_Name[0] != 0x00 && count < maxEntry){
+      count++;
+      if (dirEntry -> DIR_Attr != 0x10 
+          &&dirEntry -> DIR_Name[0] == 0xE5 
+          && checkSameFile(dirEntry, fileToRecover)){
+          
+        if (!sha && tmp){
+          printf("%s: multiple candidates found\n", fileToRecover);
+          return;
         }
+        if (sha){
+          if (sameSHA(fs, boot, dirEntry, sha)){
+            tmp = dirEntry;
+            break;
+          }
+        }
+        else
+          tmp = dirEntry;
       }
-      else
-        tmp = dirEntry;
+      dirEntry++;
     }
-    dirEntry++;
-  }
   
-  if (tmp){
-    tmp -> DIR_Name[0] = fileToRecover[0];
-    setFAT(fs, boot, tmp);
-    if (sha)
-      printf("%s: successfully recovered with SHA-1\n", fileToRecover);
-    else
-      printf("%s: successfully recovered\n", fileToRecover);
-    return;
+    if (tmp){
+      tmp -> DIR_Name[0] = fileToRecover[0];
+      setFAT(fs, boot, tmp);
+      if (sha)
+        printf("%s: successfully recovered with SHA-1\n", fileToRecover);
+      else
+        printf("%s: successfully recovered\n", fileToRecover);
+      return;
+    }
+    curBlock = getNextBlock(fat, curBlock);
   }
   printf("%s: file not found\n", fileToRecover);
 }
