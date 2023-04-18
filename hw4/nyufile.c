@@ -58,42 +58,6 @@ void printFileSystem(char *disk){
   printf("Number of bytes per sector = %d\n", boot -> BPB_BytsPerSec);
   printf("Number of sectors per cluster = %d\n", boot -> BPB_SecPerClus);
   printf("Number of reserved sectors = %d\n", boot -> BPB_RsvdSecCnt);
-  //printf("Root cluser: %d\n", boot -> BPB_RootClus);
-}
-
-int listDir(int numBlock, void *fs, BootEntry *boot);
-
-unsigned int getOffsetToFAT(BootEntry *boot){
-  return boot -> BPB_RsvdSecCnt * boot -> BPB_BytsPerSec;
-}
-
-unsigned int getOffsetToData(BootEntry *boot, int num){
-  return (boot -> BPB_RsvdSecCnt + boot -> BPB_NumFATs * boot -> BPB_FATSz32
-          + (num - 2) * boot -> BPB_SecPerClus) * boot -> BPB_BytsPerSec;
-}
-
-unsigned int getStartBlock(DirEntry *dirEntry){
-  return (dirEntry -> DIR_FstClusHI << 16) | dirEntry -> DIR_FstClusLO;
-}
-
-unsigned int getNextBlock(unsigned int *fat, unsigned int curBlock){
-  return *(fat + curBlock);
-}
-
-void listRootDir(char *disk){
-  unsigned int *fs = readFileSystem(disk);
-  BootEntry *boot = (BootEntry *)fs;
-  unsigned int offset = getOffsetToFAT(boot);
-  unsigned int *fat = (unsigned int *)((char *)fs + offset);
-  
-  unsigned int curBlock = boot -> BPB_RootClus;
-  int numEntry= 0;
-  
-  while (curBlock < 0x0ffffff8) {
-    numEntry += listDir(curBlock, fs, boot);
-    curBlock = getNextBlock(fat, curBlock);
-  }
-  printf("Total number of entries = %d\n", numEntry);
 }
 
 void parsingName(unsigned char *dirName, char *filename, 
@@ -108,47 +72,59 @@ void parsingName(unsigned char *dirName, char *filename,
     filetype[i - FILENAME_SIZE] = dirName[i];
 }
 
-int listDir(int numBlock, void *fs, BootEntry *boot){
-  unsigned int offset = getOffsetToData(boot, numBlock);
-  int numEntry=0;
-  DirEntry *dirEntry = (DirEntry *) ((char *)fs + offset);
-  int count=0;
+void listRootDir(char *disk){
+  unsigned int *fs = readFileSystem(disk);
+  BootEntry *boot = (BootEntry *)fs;
+  unsigned int offset = getOffsetToFAT(boot);
+  unsigned int *fat = (unsigned int *)((char *)fs + offset);
+  
+  unsigned int curBlock = boot -> BPB_RootClus;
+  int numEntry= 0;
   int maxEntry = (boot -> BPB_BytsPerSec * boot -> BPB_SecPerClus) / DIRENTRY_SIZE;
-  
-  while (dirEntry -> DIR_Name[0] != 0x00 && count < maxEntry){
-    count++;
-    if (dirEntry -> DIR_Name[0] == 0xe5){
-      dirEntry++;
-      continue;
-    }
-    char filename[FILENAME_SIZE + 1] = {'\0'};
-    char filetype[FILETYPE_SIZE + 1] = {'\0'};
-  
-    parsingName(dirEntry -> DIR_Name, filename, filetype, false, " ");
-    unsigned int curBlock = getStartBlock(dirEntry);
-    if (dirEntry -> DIR_Attr != 0x10 && dirEntry -> DIR_FileSize){
-      if (filetype[0] != '\0')
-        printf("%s.%s (size = %d, starting cluster = %d)\n", 
-            filename,
-            filetype,
-            dirEntry -> DIR_FileSize,
-            curBlock);
+  while (curBlock < 0x0ffffff8) {
+    unsigned int offset = getOffsetToData(boot, curBlock);
+    DirEntry *dirEntry = (DirEntry *) ((char *)fs + offset);
+    int count=0;
+    while (dirEntry -> DIR_Name[0] != 0x00 && count < maxEntry){
+      count++;
+      if (dirEntry -> DIR_Name[0] == 0xe5){
+        dirEntry++;
+        continue;
+      }
+      char filename[FILENAME_SIZE + 1] = {'\0'};
+      char filetype[FILETYPE_SIZE + 1] = {'\0'};
+    
+      parsingName(dirEntry -> DIR_Name, filename, filetype, false, " ");
+      unsigned int curBlock = getStartBlock(dirEntry);
+      if (dirEntry -> DIR_Attr != 0x10 && dirEntry -> DIR_FileSize){
+        if (filetype[0] != '\0')
+          printf("%s.%s (size = %d, starting cluster = %d)\n", 
+              filename,
+              filetype,
+              dirEntry -> DIR_FileSize,
+              curBlock);
       else 
         printf("%s (size = %d, starting cluster = %d)\n", 
             filename,
             dirEntry -> DIR_FileSize,
             curBlock);
+      }
+      else if (dirEntry -> DIR_Attr != 0x10 && !dirEntry -> DIR_FileSize){
+        if (filetype[0] != '\0')
+          printf("%s.%s (size = 0)\n", filename, filetype);
+        else
+          printf("%s (size = 0)\n", filename);
+      }
+      else
+        printf("%s/ (starting cluster = %d)\n", 
+              filename,
+              curBlock);
+      dirEntry++;
+      numEntry++;
     }
-    else if (dirEntry -> DIR_Attr != 0x10 && !dirEntry -> DIR_FileSize)
-      printf("%s (size = 0)\n", filename);
-    else
-      printf("%s/ (starting cluster = %d)\n", 
-            filename,
-            curBlock);
-    dirEntry++;
-    numEntry++;
+    curBlock = getNextBlock(fat, curBlock);
   }
-  return numEntry;
+  printf("Total number of entries = %d\n", numEntry);
 }
 
 bool checkSameFile(DirEntry *dirEntry, char *fileToRecover){
@@ -186,35 +162,22 @@ void setFAT(void *fs, BootEntry *boot, DirEntry *dirEntry){
 
 bool sameSHA(void *fs, BootEntry *boot, DirEntry *dirEntry, char *sha){
   unsigned int offsetToFat = getOffsetToFAT(boot);
-  
-
   unsigned int *fat = (unsigned int *)((char *) fs + offsetToFat);
-  
-
   unsigned char *fileContent = (unsigned char *)(malloc(sizeof(unsigned char) * dirEntry -> DIR_FileSize));
-  
-  //int fileSize = dirEntry -> DIR_FileSize;
- 
-  //offsetToBlock = 4608;
-  //printf("%d\n", offsetToBlock);
   
   int leftFileSize = dirEntry -> DIR_FileSize;
   unsigned int startBlock = getStartBlock(dirEntry);
   unsigned int blockSize = boot -> BPB_BytsPerSec * boot -> BPB_SecPerClus;
   int idx=0;
   while (leftFileSize > 0){
-    
     unsigned int offsetToData = getOffsetToData(boot, startBlock++);
-   
     unsigned char *data = (unsigned char *)((char *) fs + offsetToData);
     unsigned int copySize = leftFileSize < blockSize ? leftFileSize : blockSize;
-    memcpy(fileContent + idx * blockSize, 
+    memcpy(fileContent + (idx++) * blockSize, 
           data, 
           copySize);
-    idx++;
     leftFileSize -= copySize;
   }
-  
   
   unsigned char md[SHA_DIGEST_LENGTH];
   SHA1(fileContent, dirEntry->DIR_FileSize, md);
@@ -225,7 +188,6 @@ bool sameSHA(void *fs, BootEntry *boot, DirEntry *dirEntry, char *sha){
   
   if (memcmp(md, shaByte, SHA_DIGEST_LENGTH) == 0)
     return true;
-  
   return false;
 }
 
@@ -281,14 +243,12 @@ void recoveryFile(char *disk, char *fileToRecover, char *sha){
 
 int main(int argc, char **argv) {
   int opt;
- 
   char *filenameCont=NULL;
   char *filenameNonCont=NULL;
   char *sha=NULL;
   if (argc < 3)
     printUsage();
   char *disk = argv[1];
-  
   while ((opt = getopt(argc, argv, "ilr:s:R:")) != -1) {
     switch (opt) {
     case 'i':
@@ -322,6 +282,8 @@ int main(int argc, char **argv) {
   }
   if (filenameCont)
     recoveryFile(disk, filenameCont, sha);
-  
+  else if (filenameNonCont)
+    recoveryFile(disk, filenameNonCont, sha);
+   
   return 0;
 }

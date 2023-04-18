@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
+#include "utils.h"
 
 void printUsage(){
   fprintf(stderr, "Usage: ./nyufile disk <options>\n"
@@ -28,4 +29,21 @@ void parsingName2(char *str, char *filename, char *filetype, const char *delim){
     else
       strcpy(filetype, token);
   }
+}
+
+unsigned int getOffsetToFAT(BootEntry *boot){
+  return boot -> BPB_RsvdSecCnt * boot -> BPB_BytsPerSec;
+}
+
+unsigned int getOffsetToData(BootEntry *boot, int num){
+  return (boot -> BPB_RsvdSecCnt + boot -> BPB_NumFATs * boot -> BPB_FATSz32
+          + (num - 2) * boot -> BPB_SecPerClus) * boot -> BPB_BytsPerSec;
+}
+
+unsigned int getStartBlock(DirEntry *dirEntry){
+  return (dirEntry -> DIR_FstClusHI << 16) | dirEntry -> DIR_FstClusLO;
+}
+
+unsigned int getNextBlock(unsigned int *fat, unsigned int curBlock){
+  return *(fat + curBlock);
 }

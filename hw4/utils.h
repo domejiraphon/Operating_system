@@ -52,4 +52,13 @@ typedef struct DirEntry {
 #pragma pack(pop)
 void printUsage();
 void parsingName2(char *, char *, char *, const char *);
+
+unsigned int getOffsetToFAT(BootEntry *);
+
+unsigned int getOffsetToData(BootEntry *, int);
+
+unsigned int getStartBlock(DirEntry *);
+unsigned int getNextBlock(unsigned int *, unsigned int);
+
+
 #endif
