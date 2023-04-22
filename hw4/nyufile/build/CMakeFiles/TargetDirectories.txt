@@ -1,0 +1,3 @@
+/Users/dome/Desktop/Spring_2023/Operating_system/hw4/nyufile/build/CMakeFiles/nyufile.dir
+/Users/dome/Desktop/Spring_2023/Operating_system/hw4/nyufile/build/CMakeFiles/edit_cache.dir
+/Users/dome/Desktop/Spring_2023/Operating_system/hw4/nyufile/build/CMakeFiles/rebuild_cache.dir
